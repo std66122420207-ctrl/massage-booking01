@@ -1,0 +1,29 @@
+# Node.js
+node_modules/
+npm-debug.log
+.env
+
+# Firebase
+serviceAccountKey.json
+.firebase/
+firebase-debug.log
+
+# Flutter
+flutter-app/build/
+flutter-app/.dart_tool/
+flutter-app/.flutter-plugins
+flutter-app/.flutter-plugins-dependencies
+flutter-app/.packages
+flutter-app/pubspec.lock
+flutter-app/android/local.properties
+flutter-app/ios/Flutter/Flutter.podspec
+flutter-app/**/google-services.json
+flutter-app/**/GoogleService-Info.plist
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

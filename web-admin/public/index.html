@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web Admin – ระบบจัดการคิวนวดแผนไทย</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Noto+Serif+Thai:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="icon" type="image/jpeg" href="img/logo.jpeg">
+<style>
+:root {
+  --forest:      #1B3A2D;
+  --forest-mid:  #234D3C;
+  --jade:        #2E7D52;
+  --jade-light:  #4CAF78;
+  --jade-pale:   #E8F5EE;
+  --mist:        #F0F5F2;
+  --white:       #FFFFFF;
+  --slate:       #64748B;
+  --slate-light: #94A3B8;
+  --border:      #E2EAE6;
+  --status-pending-bg:   #FEF9E7; --status-pending-text:  #B7770D;
+  --status-confirm-bg:   #EBF5FB; --status-confirm-text:  #1A6E9E;
+  --status-active-bg:    #E8F8F0; --status-active-text:   #1E7B4B;
+  --status-done-bg:      #F4F6F7; --status-done-text:     #566573;
+  --status-cancel-bg:    #FDEDEC; --status-cancel-text:   #A93226;
+  --sidebar-w: 260px;
+  --topbar-h:  60px;
+  --radius:    12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow-sm: 0 1px 3px rgba(27,58,45,0.08), 0 1px 2px rgba(27,58,45,0.04);
+  --shadow-md: 0 4px 12px rgba(27,58,45,0.10), 0 2px 4px rgba(27,58,45,0.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: 'IBM Plex Sans Thai', 'Sarabun', system-ui, sans-serif;
+  background: var(--mist); color: var(--forest);
+  min-height: 100vh; display: flex; -webkit-font-smoothing: antialiased;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w); background: var(--forest);
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-logo {
+  padding: 22px 20px 18px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.logo-icon {
+  width: 38px; height: 38px;
+  background: #fff;
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(46,125,82,0.4);
+  overflow: hidden; padding: 3px; box-sizing: border-box;
+}
+.logo-icon img { width: 100%; height: 100%; object-fit: contain; }
+.sidebar-item .icon { font-size: 15px; width: 22px; text-align: center; flex-shrink: 0; color: inherit; }
+.sidebar-logo h2 {
+  font-family: 'Noto Serif Thai', serif; font-size: 15px; font-weight: 600;
+  color: #fff; letter-spacing: -0.01em; line-height: 1.2;
+}
+.sidebar-logo p { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; letter-spacing: 0.04em; text-transform: uppercase; }
+.sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; scrollbar-width: none; }
+.sidebar-nav::-webkit-scrollbar { display: none; }
+.nav-section-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(255,255,255,0.28); padding: 16px 10px 6px;
+}
+.sidebar-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px 9px 12px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 14px; font-weight: 500;
+  color: rgba(255,255,255,0.6); border: none; background: none;
+  width: 100%; text-align: left; margin-bottom: 1px; font-family: inherit;
+  transition: background 0.15s, color 0.15s; position: relative;
+}
+.sidebar-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.9); }
+.sidebar-item.active { background: rgba(76,175,120,0.18); color: #fff; }
+.sidebar-item.active::before {
+  content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 3px; background: var(--jade-light); border-radius: 0 2px 2px 0;
+}
+.sidebar-footer {
+  padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.07);
+  font-size: 11px; color: rgba(255,255,255,0.25); display: flex; align-items: center; gap: 6px;
+}
+
+/* ── MAIN ── */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.topbar {
+  height: var(--topbar-h); background: var(--white);
+  border-bottom: 1px solid var(--border); padding: 0 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar h3 { font-family: 'Noto Serif Thai', serif; font-size: 16px; font-weight: 600; color: var(--forest); letter-spacing: -0.01em; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.search-box {
+  background: var(--mist); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 7px 14px 7px 34px; font-family: inherit; font-size: 13.5px; width: 220px;
+  outline: none; color: var(--forest); transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-wrap { position: relative; display: flex; align-items: center; }
+.search-wrap i { position: absolute; left: 12px; font-size: 12.5px; color: var(--slate-light); pointer-events: none; }
+.search-box:focus { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(46,125,82,0.12); }
+.admin-badge {
+  display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px;
+  border-radius: 30px; border: 1px solid var(--border); background: var(--white);
+  font-size: 13px; color: var(--forest); font-weight: 500; cursor: pointer; transition: border-color 0.15s;
+}
+.admin-badge:hover { border-color: var(--jade); }
+.admin-avatar {
+  width: 26px; height: 26px; background: var(--jade); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; font-weight: 700;
+}
+.content { padding: 24px 28px 40px; flex: 1; }
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.18s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── STATS ── */
+.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--white); border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  position: relative; overflow: hidden; transition: box-shadow 0.2s;
+}
+.stat-card:hover { box-shadow: var(--shadow-md); }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 4px; }
+.stat-card:nth-child(1)::before { background: var(--jade); }
+.stat-card:nth-child(2)::before { background: #F59E0B; }
+.stat-card:nth-child(3)::before { background: #10B981; }
+.stat-card:nth-child(4)::before { background: #3B82F6; }
+.stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.stat-info p { font-size: 11.5px; color: var(--slate); margin-bottom: 3px; font-weight: 500; }
+.stat-info h3 { font-family: 'Noto Serif Thai', serif; font-size: 24px; color: var(--forest); font-weight: 700; line-height: 1; }
+.stat-info small { font-size: 11px; color: var(--jade); display: block; margin-top: 3px; }
+
+/* ── CARDS ── */
+.charts-row { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; margin-bottom: 20px; }
+.card { background: var(--white); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.card-header h4 { font-family: 'Noto Serif Thai', serif; font-size: 14.5px; color: var(--forest); font-weight: 600; }
+
+/* ── BADGES ── */
+.badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
+.badge-green  { background: var(--status-active-bg);  color: var(--status-active-text); }
+.badge-yellow { background: var(--status-pending-bg); color: var(--status-pending-text); }
+.badge-blue   { background: var(--status-confirm-bg); color: var(--status-confirm-text); }
+.badge-red    { background: var(--status-cancel-bg);  color: var(--status-cancel-text); }
+.badge-gray   { background: var(--status-done-bg);    color: var(--status-done-text); }
+
+/* ── CHART ── */
+.mini-chart { height: 110px; display: flex; align-items: flex-end; gap: 5px; }
+.bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; height: 100%; justify-content: flex-end; }
+.bar { width: 100%; background: linear-gradient(to top, var(--jade) 0%, var(--jade-light) 100%); border-radius: 4px 4px 0 0; transition: height 0.4s cubic-bezier(0.34,1.56,0.64,1); min-height: 4px; }
+.bar-wrap:last-child .bar { background: linear-gradient(to top, var(--forest) 0%, var(--jade) 100%); }
+.bar-label { font-size: 10.5px; color: var(--slate-light); font-weight: 500; }
+
+/* ── QUICK ACTIONS ── */
+.quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.quick-btn {
+  background: var(--mist); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 14px; display: flex; align-items: center; gap: 8px;
+  cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--forest); transition: background 0.15s, border-color 0.15s, transform 0.1s; text-align: left;
+}
+.quick-btn:hover { background: var(--jade-pale); border-color: rgba(46,125,82,0.3); }
+.quick-btn:active { transform: scale(0.98); }
+
+/* ── TABLE ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th {
+  text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--slate);
+  background: var(--mist); border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+tbody td { padding: 12px 14px; border-bottom: 1px solid #F3F6F4; color: var(--forest); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { transition: background 0.12s; }
+tbody tr:hover td { background: var(--jade-pale); }
+.queue-id { font-family: 'Noto Serif Thai', serif; font-weight: 700; color: var(--jade); font-size: 14px; }
+
+/* ── ACTION BTNS ── */
+.action-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: var(--radius-xs); border: 1px solid transparent;
+  cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600;
+  transition: all 0.15s; margin-right: 4px;
+}
+.action-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.btn-call   { background: var(--jade-pale); color: var(--jade); border-color: rgba(46,125,82,0.2); }
+.btn-done   { background: var(--status-active-bg); color: var(--status-active-text); border-color: rgba(30,123,75,0.2); }
+.btn-cancel { background: var(--status-cancel-bg); color: var(--status-cancel-text); border-color: rgba(169,50,38,0.2); }
+.btn-edit   { background: var(--status-pending-bg); color: var(--status-pending-text); border-color: rgba(183,119,13,0.2); }
+
+/* ── FORMS ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--slate); letter-spacing: 0.03em; text-transform: uppercase; }
+.form-group input, .form-group select {
+  background: var(--mist); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 9px 12px; font-family: inherit; font-size: 14px; color: var(--forest);
+  outline: none; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.form-group input:focus, .form-group select:focus {
+  border-color: var(--jade); background: var(--white); box-shadow: 0 0 0 3px rgba(46,125,82,0.1);
+}
+.btn-primary {
+  background: var(--jade); color: #fff; border: none; border-radius: var(--radius-sm);
+  padding: 10px 22px; font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.btn-primary:hover { background: var(--forest-mid); box-shadow: 0 4px 12px rgba(46,125,82,0.3); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-secondary {
+  background: transparent; color: var(--slate); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 22px; font-family: inherit;
+  font-size: 14px; cursor: pointer; margin-left: 8px; transition: border-color 0.15s, color 0.15s;
+}
+.btn-secondary:hover { border-color: var(--slate); color: var(--forest); }
+
+/* ── STAFF ── */
+.staff-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.staff-card {
+  background: var(--white); border-radius: var(--radius); border: 1px solid var(--border);
+  padding: 28px 20px 22px; text-align: center; box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.staff-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.staff-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--jade-light), var(--jade));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 14px; box-shadow: 0 4px 12px rgba(46,125,82,0.25);
+}
+.staff-name { font-family: 'Noto Serif Thai', serif; font-size: 16px; color: var(--forest); font-weight: 600; margin-bottom: 3px; }
+.staff-exp { font-size: 12px; color: var(--slate); margin-bottom: 12px; }
+.staff-count { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; color: var(--slate); }
+.staff-count strong { color: var(--jade); font-weight: 700; }
+.staff-photo-img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin: 0 auto 14px; display: block; box-shadow: 0 4px 12px rgba(46,125,82,0.25); }
+.staff-add-btn { margin-bottom: 16px; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 400; background: rgba(27,58,45,0.45);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-card {
+  background: var(--white); border-radius: var(--radius); padding: 28px 26px;
+  width: 100%; max-width: 400px; box-shadow: var(--shadow-md);
+}
+.modal-card h4 { font-family: 'Noto Serif Thai', serif; color: var(--forest); margin-bottom: 18px; font-size: 17px; }
+.modal-card .form-group { margin-bottom: 14px; }
+.modal-card label { display: block; font-size: 13px; font-weight: 500; color: var(--forest); margin-bottom: 6px; }
+.modal-card input {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.modal-card input:focus { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(46,125,82,0.12); }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions .btn-secondary { margin-left: 0; flex: 1; }
+.modal-actions .btn-primary { flex: 1; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 28px; right: 28px; background: var(--forest); color: #fff;
+  padding: 13px 20px; border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 500;
+  z-index: 999; opacity: 0; transform: translateY(8px);
+  transition: opacity 0.25s, transform 0.25s; pointer-events: none;
+  box-shadow: 0 8px 24px rgba(27,58,45,0.25); max-width: 320px;
+  border-left: 3px solid var(--jade-light);
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ── QUEUE PAGE ── */
+.queue-current-num {
+  font-family: 'Noto Serif Thai', serif; font-size: 58px; font-weight: 700;
+  color: var(--jade); line-height: 1; letter-spacing: -0.02em;
+}
+
+/* ── LOGIN SCREEN ── */
+#login-screen {
+  position: fixed; inset: 0; z-index: 500;
+  background: linear-gradient(160deg, var(--forest) 0%, var(--forest-mid) 100%);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.login-card {
+  background: var(--white); border-radius: var(--radius); padding: 36px 32px;
+  width: 100%; max-width: 360px; box-shadow: var(--shadow-md);
+}
+.login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+.login-logo .logo-icon { box-shadow: 0 2px 8px rgba(46,125,82,0.25); }
+.login-logo h2 { font-family: 'Noto Serif Thai', serif; font-size: 17px; font-weight: 600; color: var(--forest); }
+.login-logo p { font-size: 11px; color: var(--slate); letter-spacing: 0.04em; text-transform: uppercase; }
+.login-card .form-group { margin-bottom: 16px; }
+.login-card label { display: block; font-size: 13px; font-weight: 500; color: var(--forest); margin-bottom: 6px; }
+.login-card input {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.login-card input:focus { border-color: var(--jade); box-shadow: 0 0 0 3px rgba(46,125,82,0.12); }
+.login-error {
+  font-size: 12.5px; color: var(--status-cancel-text); min-height: 16px; margin-bottom: 8px;
+}
+.login-submit-loading { opacity: 0.7; pointer-events: none; }
+@media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 960px) {
+  .charts-row, .form-grid, .staff-grid { grid-template-columns: 1fr; }
+  .sidebar { width: 210px; } .main { margin-left: 210px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ───────────────────────────────────────── -->
+<div id="login-screen">
+  <form id="login-form" class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon"><img src="img/logo.jpeg" alt="โลโก้"></div>
+      <div>
+        <h2>ท่าวังหิน</h2>
+        <p>Web Admin</p>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>อีเมลแอดมิน</label>
+      <input type="email" id="login-email" required autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>รหัสผ่าน</label>
+      <input type="password" id="login-password" required autocomplete="current-password">
+    </div>
+    <p id="login-error" class="login-error"></p>
+    <button type="submit" class="btn-primary" style="width:100%" id="login-submit">เข้าสู่ระบบ</button>
+  </form>
+</div>
+
+
+<div id="app-shell" style="display:none">
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon"><img src="img/logo.jpeg" alt="โลโก้"></div>
+    <div>
+      <h2>ท่าวังหิน</h2>
+      <p>Web Admin</p>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">หลัก</div>
+    <button class="sidebar-item active" data-page="dashboard"><i class="fa-solid fa-gauge icon"></i> แผงควบคุมหลัก</button>
+    <button class="sidebar-item" data-page="bookings"><i class="fa-solid fa-clipboard-list icon"></i> จัดการการจอง</button>
+    <button class="sidebar-item" data-page="queue"><i class="fa-solid fa-list-ol icon"></i> จัดการคิว</button>
+    <div class="nav-section-label">ข้อมูล</div>
+    <button class="sidebar-item" data-page="staff"><i class="fa-solid fa-user-group icon"></i> แพทย์/หมอนวด</button>
+    <button class="sidebar-item" data-page="report"><i class="fa-solid fa-chart-line icon"></i> รายงาน</button>
+    <div class="nav-section-label">ระบบ</div>
+    <button class="sidebar-item" data-page="settings"><i class="fa-solid fa-gear icon"></i> ตั้งค่า</button>
+  </nav>
+  <div class="sidebar-footer">v1.0.0 · ระบบจองคิวนวดแผนไทย</div>
+</aside>
+
+<main class="main">
+  <header class="topbar">
+    <h3 id="page-title">แผงควบคุมหลัก</h3>
+    <div class="topbar-right">
+      <button class="btn-secondary" id="btn-sync-sheets" style="margin-left:0"><i class="fa-solid fa-table-cells"></i> Sync to Google Sheets</button>
+      <button class="btn-primary" id="btn-notify-therapists"><i class="fa-solid fa-envelope"></i> Email หมอนวด</button>
+      <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input class="search-box" type="text" placeholder="ค้นหาชื่อลูกค้า / คิว..."></div>
+      <div class="admin-badge">
+        <div class="admin-avatar">A</div>
+        <span>แอดมิน</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <section id="page-dashboard" class="page active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#E8F5EE"><i class="fa-solid fa-calendar-check" style="color:#2E7D52"></i></div>
+          <div class="stat-info"><p>จองวันนี้</p><h3 id="stat-total">-</h3><small id="stat-total-sub"></small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF9E7">⏳</div>
+          <div class="stat-info"><p>คิวที่รออยู่</p><h3 id="stat-waiting">-</h3><small id="stat-current"></small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#E8F8F0"><i class="fa-solid fa-circle-check" style="color:#2E7D52"></i></div>
+          <div class="stat-info"><p>นวดเสร็จแล้ว</p><h3 id="stat-done">-</h3><small>วันนี้</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EBF5FB"><i class="fa-solid fa-sack-dollar" style="color:#2E86DE"></i></div>
+          <div class="stat-info"><p>รายได้วันนี้</p><h3 id="stat-revenue">-</h3><small>บาท</small></div>
+        </div>
+      </div>
+      <div class="stats-grid" style="margin-top:14px">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#F4EBFB"><i class="fa-solid fa-user-group" style="color:#8E44AD"></i></div>
+          <div class="stat-info"><p>หมอนวดทั้งหมด</p><h3 id="stat-staff-count">-</h3><small>คน</small></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FEF9E7"><i class="fa-solid fa-bell" style="color:#B7770D"></i></div>
+          <div class="stat-info"><p>รอการยืนยัน</p><h3 id="stat-notif-pending">-</h3><small>คน</small></div>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-header">
+            <h4>แนวโน้มการจอง (7 วัน)</h4>
+            <span class="badge badge-green">สัปดาห์นี้</span>
+          </div>
+          <div class="mini-chart" id="trend-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h4>Quick Actions</h4></div>
+          <div class="quick-grid">
+            <button class="quick-btn" data-goto="bookings"><i class="fa-solid fa-clipboard-list"></i> เพิ่มการจองใหม่</button>
+            <button class="quick-btn" id="btn-call-next"><i class="fa-solid fa-bullhorn"></i> เรียกคิวถัดไป</button>
+            <button class="quick-btn" data-goto="report"><i class="fa-solid fa-file-lines"></i> สรุปรายงานวันนี้</button>
+            <button class="quick-btn" data-goto="queue"><i class="fa-solid fa-list-ol"></i> จัดการคิวว่าง</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOOKINGS -->
+    <section id="page-bookings" class="page">
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><h4>เพิ่มการจองใหม่</h4></div>
+        <form id="booking-form" class="form-grid">
+          <div class="form-group"><label>ชื่อผู้รับบริการ</label><input type="text" id="f-name" placeholder="ชื่อ-นามสกุล" required></div>
+          <div class="form-group"><label>เบอร์โทร</label><input type="text" id="f-phone" placeholder="08X-XXX-XXXX"></div>
+          <div class="form-group"><label>บริการ</label><select id="f-service"></select></div>
+          <div class="form-group"><label>หมอนวด</label><select id="f-staff"></select></div>
+          <div class="form-group"><label>วันที่</label><input type="date" id="f-date" required></div>
+          <div class="form-group"><label>เวลา</label>
+            <select id="f-time">
+              <option>09:00</option><option>09:30</option><option>10:00</option><option>10:30</option>
+              <option>11:00</option><option>11:30</option><option>13:00</option><option>13:30</option>
+              <option>14:00</option><option>14:30</option><option>15:00</option><option>15:30</option>
+            </select>
+          </div>
+          <div style="grid-column:1/-1;display:flex;align-items:center;gap:0">
+            <button type="submit" class="btn-primary">+ เพิ่มการจอง</button>
+            <button type="reset" class="btn-secondary">ล้างข้อมูล</button>
+          </div>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h4>รายการจองทั้งหมดวันนี้</h4>
+          <span class="badge badge-blue" id="bookings-count">0 รายการ</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>คิว</th><th>เวลา</th><th>ชื่อลูกค้า</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+            <tbody id="bookings-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUEUE -->
+    <section id="page-queue" class="page">
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px">
+        <div class="card">
+          <div class="card-header"><h4>สถานะคิวปัจจุบัน</h4></div>
+          <div style="text-align:center;padding:16px 0 12px">
+            <p style="font-size:11px;color:var(--slate);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">กำลังให้บริการ</p>
+            <div class="queue-current-num" id="queue-current">-</div>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+          <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0">
+            <span style="color:var(--slate)">คิวรออยู่</span><strong id="queue-waiting-count">0 คิว</strong>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0">
+            <span style="color:var(--slate)">เสร็จแล้ววันนี้</span><strong id="queue-done-count">0 คิว</strong>
+          </div>
+          <button class="btn-primary" style="width:100%;margin-top:18px" id="btn-call-next-2"><i class="fa-solid fa-bullhorn"></i> เรียกคิวถัดไป</button>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h4>คิวที่รออยู่</h4>
+            <span class="badge badge-yellow" id="queue-list-count">0 คิว</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>คิว</th><th>เวลาจอง</th><th>ชื่อลูกค้า</th><th>บริการ</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+              <tbody id="queue-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header">
+            <h4>สถานะการแจ้งเตือน</h4>
+            <span class="badge badge-yellow" id="notif-pending-count">0 คนยังไม่ยืนยัน</span>
+          </div>
+          <p style="font-size:12.5px;color:var(--slate);margin:-4px 0 10px">
+            ลูกค้าที่ "ยังไม่ยืนยัน" หลังเรียกคิว อาจไม่เห็นการแจ้งเตือนในแอป — โทรติดต่อจากเบอร์ด้านล่างได้เลย
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ข้อความ</th><th>ลูกค้า</th><th>เบอร์โทร</th><th>เวลาแจ้ง</th><th>สถานะ</th></tr></thead>
+              <tbody id="notif-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAFF -->
+    <section id="page-staff" class="page">
+      <button class="btn-primary staff-add-btn" onclick="openStaffModal()">+ เพิ่มหมอนวดใหม่</button>
+      <div class="staff-grid" id="staff-grid"></div>
+    </section>
+
+    <!-- REPORT -->
+    <section id="page-report" class="page">
+      <div class="card">
+        <div class="card-header"><h4>รายงานสรุปรายสัปดาห์</h4></div>
+        <table>
+          <thead><tr><th>วัน</th><th>จองทั้งหมด</th><th>เสร็จสิ้น</th><th>ยกเลิก</th><th>รายได้</th></tr></thead>
+          <tbody id="report-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="page-settings" class="page">
+      <div class="card" style="max-width:600px">
+        <div class="card-header"><h4>ตั้งค่าระบบ</h4></div>
+        <form id="settings-form" class="form-grid">
+          <div class="form-group" style="grid-column:1/-1"><label>ชื่อศูนย์สุขภาพ</label><input type="text" id="s-name" value="ศูนย์สุขภาพชุมชนท่าวังหิน"></div>
+          <div class="form-group"><label>เปิดทำการ</label><input type="time" id="s-open" value="08:30"></div>
+          <div class="form-group"><label>ปิดทำการ</label><input type="time" id="s-close" value="17:00"></div>
+          <div class="form-group"><label>จองล่วงหน้าได้ไม่เกิน (วัน)</label><input type="number" id="s-advance" value="3" min="1" max="7"></div>
+          <div class="form-group"><label>จำนวนคิวต่อวัน</label><input type="number" id="s-maxqueue" value="60"></div>
+          <div style="grid-column:1/-1"><button type="submit" class="btn-primary">บันทึกการตั้งค่า</button></div>
+        </form>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+</div><!-- /app-shell -->
+
+<!-- ── STAFF ADD/EDIT MODAL ─────────────────────────────────── -->
+<div id="staff-modal-overlay" class="modal-overlay" style="display:none">
+  <form id="staff-modal-form" class="modal-card">
+    <h4 id="staff-modal-title">เพิ่มหมอนวดใหม่</h4>
+    <input type="hidden" id="staff-modal-id">
+    <div class="form-group">
+      <label>ชื่อ</label>
+      <input type="text" id="staff-modal-name" required>
+    </div>
+    <div class="form-group">
+      <label>อีเมล (สำหรับส่งแจ้งคิว)</label>
+      <input type="email" id="staff-modal-email">
+    </div>
+    <div class="form-group">
+      <label>ประสบการณ์</label>
+      <input type="text" id="staff-modal-experience" placeholder="เช่น 5 ปี">
+    </div>
+    <div class="form-group">
+      <label>URL รูปภาพ</label>
+      <input type="url" id="staff-modal-photo" placeholder="https://...">
+    </div>
+    <p id="staff-modal-error" class="login-error"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeStaffModal()">ยกเลิก</button>
+      <button type="submit" class="btn-primary" id="staff-modal-submit">บันทึก</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

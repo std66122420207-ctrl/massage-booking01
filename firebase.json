@@ -1,0 +1,17 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": {
+    "source": ".",
+    "runtime": "nodejs20"
+  },
+  "hosting": {
+    "public": "web-admin/public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/api{,/**}", "function": { "functionId": "api", "region": "asia-southeast1" } }
+    ]
+  }
+}

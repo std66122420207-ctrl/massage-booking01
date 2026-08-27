@@ -1,0 +1,8 @@
+firebase-debug.log
+.firebase/
+node_modules/
+server/node_modules/
+functions/node_modules/
+flutter-app/
+*.env
+serviceAccountKey.json
