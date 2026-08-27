@@ -24,7 +24,7 @@ function validateEnv() {
     process.exit(1);
   }
 
-  const mockThaid = process.env.NODE_ENV !== 'production' && process.env.MOCK_THAID === 'true';
+  const mockThaid = process.env.DEMO_MODE === 'true' && process.env.MOCK_THAID === 'true';
   if (!mockThaid) {
     const missingThaid = ['THAID_CLIENT_ID', 'THAID_CLIENT_SECRET', 'THAID_REDIRECT_URI']
       .filter((key) => !process.env[key] || /your-|YOUR_|replace_with/i.test(process.env[key]));

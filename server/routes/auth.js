@@ -6,7 +6,7 @@ const { createRemoteJWKSet, jwtVerify } = require('jose');
 
 // mock mode เปิดได้เฉพาะตอน NODE_ENV ไม่ใช่ production เท่านั้น (กันพลาดเปิดใน production
 // จริงโดยไม่ตั้งใจ ต่อให้ตั้ง MOCK_THAID=true ทิ้งไว้ใน .env ก็ตาม)
-const MOCK_THAID = process.env.NODE_ENV !== 'production' && process.env.MOCK_THAID === 'true';
+const MOCK_THAID = process.env.DEMO_MODE === 'true' && process.env.MOCK_THAID === 'true';
 
 // ── ThaiD OAuth Login ──────────────────────────────────────
 // เก็บ state ชั่วคราวในหน่วยความจำเพื่อป้องกัน CSRF พร้อม PKCE code_verifier

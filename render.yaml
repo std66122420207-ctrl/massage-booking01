@@ -14,6 +14,10 @@ services:
         value: 10000
       - key: FRONTEND_URL
         value: '*'
+      - key: DEMO_MODE
+        value: 'true'
+      - key: MOCK_THAID
+        value: 'true'
       - key: APP_URL
         sync: false
       - key: FIREBASE_PROJECT_ID
@@ -24,20 +28,12 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: THAID_CLIENT_ID
-        sync: false
-      - key: THAID_CLIENT_SECRET
-        sync: false
-      - key: THAID_REDIRECT_URI
-        sync: false
       - key: THAID_API_BASE
         value: https://imauth.bora.dopa.go.th
       - key: THAID_SCOPE
         value: openid pid name given_name family_name birthdate
       - key: THAID_TOKEN_AUTH
         value: basic
-      - key: MOCK_THAID
-        value: 'false'
       - key: GOOGLE_SHEETS_CLIENT_EMAIL
         sync: false
       - key: GOOGLE_SHEETS_PRIVATE_KEY
