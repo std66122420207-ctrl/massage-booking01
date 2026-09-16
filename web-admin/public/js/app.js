@@ -183,6 +183,49 @@ function renderStaffGrid() {
 const staffModalOverlay = document.getElementById('staff-modal-overlay');
 const staffModalForm    = document.getElementById('staff-modal-form');
 const staffModalError   = document.getElementById('staff-modal-error');
+const staffUploadBtn    = document.getElementById('staff-photo-upload-btn');
+const staffImageInput   = document.getElementById('staff-modal-image');
+const staffPhotoInput   = document.getElementById('staff-modal-photo');
+
+async function uploadStaffImage(file) {
+  if (!file) return null;
+
+  const storage = firebase.storage();
+  const timestamp = Date.now();
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storageRef = storage.ref(`staff-photos/${timestamp}_${safeName}`);
+
+  try {
+    const snapshot = await storageRef.put(file);
+    const downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
+  } catch (err) {
+    throw new Error(`อัปโหลดรูปไม่สำเร็จ: ${err.message || 'กรุณาลองใหม่'}`);
+  }
+}
+
+async function handleStaffPhotoUpload() {
+  const file = staffImageInput.files?.[0];
+  if (!file) {
+    showToast('กรุณาเลือกไฟล์รูปภาพก่อน');
+    return;
+  }
+
+  try {
+    staffUploadBtn.disabled = true;
+    staffUploadBtn.textContent = 'กำลังอัปโหลด...';
+    const url = await uploadStaffImage(file);
+    staffPhotoInput.value = url;
+    showToast('อัปโหลดรูปเรียบร้อยแล้ว ✓');
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    staffUploadBtn.disabled = false;
+    staffUploadBtn.textContent = 'อัปโหลดรูป';
+  }
+}
+
+staffUploadBtn.addEventListener('click', handleStaffPhotoUpload);
 
 function openStaffModal(staff) {
   staffModalError.textContent = '';
@@ -192,11 +235,14 @@ function openStaffModal(staff) {
   document.getElementById('staff-modal-email').value      = staff?.email || '';
   document.getElementById('staff-modal-experience').value = staff?.experience || '';
   document.getElementById('staff-modal-photo').value      = staff?.photo || '';
+  staffImageInput.value = '';
   staffModalOverlay.style.display = 'flex';
 }
 
 function closeStaffModal() {
   staffModalOverlay.style.display = 'none';
+  staffImageInput.value = '';
+  staffPhotoInput.value = '';
 }
 
 async function changeStaffStatus(id, status) {
@@ -223,14 +269,24 @@ staffModalForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const id         = document.getElementById('staff-modal-id').value;
   const submitBtn  = document.getElementById('staff-modal-submit');
-  const data = {
-    name:       document.getElementById('staff-modal-name').value.trim(),
-    email:      document.getElementById('staff-modal-email').value.trim(),
-    experience: document.getElementById('staff-modal-experience').value.trim(),
-    photo:      document.getElementById('staff-modal-photo').value.trim(),
-  };
+  const file = staffImageInput.files?.[0];
+  const photoFromInput = staffPhotoInput.value.trim();
+
   submitBtn.disabled = true; submitBtn.textContent = 'กำลังบันทึก...';
   try {
+    let photoUrl = photoFromInput;
+    if (file && !photoUrl) {
+      photoUrl = await uploadStaffImage(file);
+      staffPhotoInput.value = photoUrl;
+    }
+
+    const data = {
+      name:       document.getElementById('staff-modal-name').value.trim(),
+      email:      document.getElementById('staff-modal-email').value.trim(),
+      experience: document.getElementById('staff-modal-experience').value.trim(),
+      photo:      photoUrl,
+    };
+
     const res = id ? await API.updateStaff(id, data) : await API.createStaff(data);
     if (res.error) throw new Error(res.error);
     showToast(id ? 'บันทึกข้อมูลหมอนวดแล้ว ✓' : 'เพิ่มหมอนวดใหม่แล้ว ✓');

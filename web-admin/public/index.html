@@ -573,8 +573,15 @@ tbody tr:hover td { background: var(--jade-pale); }
       <input type="text" id="staff-modal-experience" placeholder="เช่น 5 ปี">
     </div>
     <div class="form-group">
-      <label>URL รูปภาพ</label>
+      <label>เลือกรูปภาพ</label>
+      <input type="file" id="staff-modal-image" accept="image/*">
+    </div>
+    <div class="form-group">
+      <label>URL รูปภาพ (อัปโหลดแล้วจะเติมอัตโนมัติ)</label>
       <input type="url" id="staff-modal-photo" placeholder="https://...">
+    </div>
+    <div class="modal-actions" style="justify-content: flex-end; margin-top: 8px;">
+      <button type="button" class="btn-secondary" id="staff-photo-upload-btn">อัปโหลดรูป</button>
     </div>
     <p id="staff-modal-error" class="login-error"></p>
     <div class="modal-actions">
@@ -588,6 +595,7 @@ tbody tr:hover td { background: var(--jade-pale); }
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
 <script src="js/app.js"></script>

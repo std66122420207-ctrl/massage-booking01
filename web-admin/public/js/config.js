@@ -1,6 +1,6 @@
 // ============================================================
-//  ใส่ค่า Firebase config ของโปรเจคคุณที่นี่
-//  หาได้จาก Firebase Console → Project Settings → General → Your apps
+//  Firebase web config
+//  ใช้ค่าจริงจาก Firebase Console → Project settings → General → Your apps
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDZR-e5Af_yn2M8FM9Xmj178nfRx3218Wo",
@@ -14,5 +14,13 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
-// API base URL (เปลี่ยนตอน deploy จริง)
-const API_BASE = window.location.origin + '/api';
+// API base URL
+// ตอนรัน local: admin เปิดบน 4000 แต่ backend รันบน 3000 จึงต้องใช้ localhost:3000/api
+// ตอน deploy จริง: เปลี่ยนเป็น URL ของ Render / Azure / server ปลายทาง
+const API_BASE = (() => {
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocalDev && (window.location.port === '4000' || window.location.port === '3000')) {
+    return 'http://localhost:3000/api';
+  }
+  return window.location.origin + '/api';
+})();
