@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>บทที่ 3 การวิเคราะห์และออกแบบระบบ - ระบบจองคิวนวดแผนไทย ศูนย์สุขภาพชุมชนท่าวังหิน</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 2.54cm 2.0cm 2.54cm 2.54cm; /* Top Right Bottom Left standard */
+    @bottom-right {
+      content: counter(page);
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13pt;
+    }
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Sarabun', 'TH Sarabun PSK', 'Segoe UI', Tahoma, sans-serif;
+    font-size: 15pt;
+    line-height: 1.6;
+    color: #1a1a1a;
+    background: #ffffff;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    page-break-after: always;
+    position: relative;
+  }
+
+  .page:last-child {
+    page-break-after: auto;
+  }
+
+  .chapter-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  h1.chapter-title {
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-size: 20pt;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    color: #0f2d1e;
+  }
+
+  h2.chapter-subtitle {
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-size: 17pt;
+    font-weight: 600;
+    margin: 0 0 24px 0;
+    color: #1b4d36;
+  }
+
+  h2.section-title {
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-size: 16pt;
+    font-weight: 600;
+    margin: 24px 0 10px 0;
+    color: #133927;
+    page-break-after: avoid;
+  }
+
+  h3.subsection-title {
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-size: 15pt;
+    font-weight: 600;
+    margin: 18px 0 8px 0;
+    color: #1d4e38;
+    page-break-after: avoid;
+  }
+
+  p {
+    margin: 0 0 10px 0;
+    text-align: justify;
+    text-justify: inter-cluster;
+    text-indent: 1.25cm;
+  }
+
+  p.no-indent {
+    text-indent: 0;
+  }
+
+  ul, ol {
+    margin: 4px 0 12px 0;
+    padding-left: 2.2cm;
+  }
+
+  li {
+    margin-bottom: 5px;
+    text-align: justify;
+  }
+
+  /* Academic Table Style */
+  .table-container {
+    margin: 16px 0 20px 0;
+    page-break-inside: avoid;
+  }
+
+  .table-caption {
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-size: 14pt;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #1a3328;
+    text-indent: 0;
+  }
+
+  table.academic-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5pt;
+    line-height: 1.45;
+    background-color: #ffffff;
+  }
+
+  table.academic-table th, 
+  table.academic-table td {
+    border: 1px solid #7c8e85;
+    padding: 8px 10px;
+    vertical-align: top;
+  }
+
+  table.academic-table th {
+    background-color: #eaf3ed;
+    color: #123324;
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  table.academic-table td.col-head {
+    font-weight: 600;
+    background-color: #f6faf7;
+    width: 28%;
+    color: #163d2a;
+  }
+
+  /* Diagram Box */
+  .diagram-container {
+    text-align: center;
+    margin: 18px 0 24px 0;
+    page-break-inside: avoid;
+  }
+
+  .diagram-caption {
+    font-family: 'Prompt', 'Sarabun', sans-serif;
+    font-size: 13.5pt;
+    font-weight: 600;
+    margin-top: 8px;
+    color: #1b382b;
+  }
+
+  svg {
+    max-width: 100%;
+    height: auto;
+    display: inline-block;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11pt;
+    font-weight: 600;
+  }
+  .badge-pk { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+  .badge-fk { background: #dbeafe; color: #1e40af; border: 1px solid #60a5fa; }
+</style>
+</head>
+<body>
+
+<!-- หน้าที่ 1 -->
+<div class="page">
+  <div class="chapter-header">
+    <h1 class="chapter-title">บทที่ 3</h1>
+    <h2 class="chapter-subtitle">การวิเคราะห์และออกแบบระบบ (System Analysis and Design)</h2>
+  </div>
+
+  <p>
+    การพัฒนา <strong>ระบบจองคิวนวดแผนไทย ศูนย์สุขภาพชุมชนท่าวังหิน</strong> มีวัตถุประสงค์เพื่อสร้างนวัตกรรมระบบบริการสุขภาพทางไกลและบริหารจัดการการนัดหมายที่มีความสะดวก ปลอดภัย และมีประสิทธิภาพสูง ครอบคลุมทั้งแอปพลิเคชันสำหรับประชาชนผู้รับบริการ (Flutter Cross-Platform Application) และระบบแดชบอร์ดบริหารจัดการสำหรับเจ้าหน้าที่และแพทย์แผนไทย (Web Admin Dashboard) ผ่านการเชื่อมต่อกับระบบให้บริการข้อมูลส่วนกลาง (Node.js/Express RESTful API) และฐานข้อมูล Cloud Firestore
+  </p>
+  <p>
+    ในบทนี้จะนำเสนอรายละเอียดการวิเคราะห์และออกแบบระบบตามระเบียบวิธีวิศวกรรมซอฟต์แวร์ ประกอบด้วย การวิเคราะห์ความต้องการของระบบ (Requirement Analysis), แผนภาพกรณีการใช้งาน (Use Case Diagram) พร้อมตารางอธิบายรายละเอียดกรณีการใช้งาน (Use Case Descriptions), แผนภาพลำดับการทำงาน (Sequence Diagrams) พร้อมอธิบายหลักการทำงานอย่างละเอียด, แผนภาพความสัมพันธ์ของข้อมูล (Entity-Relationship Diagram: ER Diagram) และโครงสร้างฐานข้อมูล (Database Schema)
+  </p>
+
+  <h2 class="section-title">3.1 การวิเคราะห์ความต้องการของระบบ (Requirement Analysis)</h2>
+  <p>
+    จากการศึกษาและรวบรวมความต้องการของศูนย์สุขภาพชุมชนท่าวังหิน สามารถจำแนกความต้องการออกเป็น 2 ด้านหลัก ดังนี้:
+  </p>
+
+  <h3 class="subsection-title">3.1.1 ความต้องการเชิงฟังก์ชัน (Functional Requirements)</h3>
+  <p class="no-indent" style="font-weight:600; margin-left: 1.25cm;">1. ส่วนของผู้ใช้บริการ (Customer / General User) ผ่านแอปพลิเคชัน Flutter:</p>
+  <ul>
+    <li><strong>ระบบยืนยันตัวตนดิจิทัล (Digital Authentication):</strong> รองรับการเข้าสู่ระบบผ่าน <strong>ThaiD Digital ID (DOPA OpenID Connect)</strong> ด้วยการตรวจจับลายเซ็นดิจิทัล (JWKS/PKCE) และรองรับการเข้าสู่ระบบด้วยหมายเลขโทรศัพท์ (Firebase Phone OTP)</li>
+    <li><strong>ระบบจัดเก็บข้อมูลติดต่อสำรอง:</strong> บังคับให้ผู้ใช้งานที่เข้าสู่ระบบผ่าน ThaiD กรอกเบอร์โทรศัพท์ เพื่อให้เจ้าหน้าที่สามารถติดต่อได้ในกรณีฉุกเฉิน</li>
+    <li><strong>ระบบสืบค้นบริการ (Services Catalog):</strong> แสดงรายการหัตถการนวดแผนไทย รายละเอียด ระยะเวลานวด และอัตราค่าบริการ</li>
+    <li><strong>ระบบจองคิวนวดแผนไทย (Online Booking):</strong> สามารถเลือกวัน เวลา บริการ และระบุแพทย์แผนไทย/หมอนวดที่ต้องการได้ พร้อมระบบตรวจสอบเวลาว่างแบบ Real-time Transaction</li>
+    <li><strong>ระบบติดตามคิวสด (Live Queue Tracking):</strong> แสดงหมายเลขคิวที่กำลังรับบริการ จำนวนคิวที่รอก่อนหน้า และเวลาคาดการณ์ในการรอ</li>
+    <li><strong>ระบบจัดการประวัติการจอง:</strong> ตรวจสอบประวัติการจองย้อนหลัง และยกเลิกการจองได้ตามเงื่อนไขเวลาที่กำหนด</li>
+    <li><strong>ระบบศูนย์การแจ้งเตือนและการยืนยันรับทราบ (Notification & Acknowledgement):</strong> รับการแจ้งเตือนเมื่อถึงคิว พร้อมปุ่ม "กดยืนยันรับทราบ" เพื่อส่งสัญญาณกลับไปยังเจ้าหน้าที่</li>
+  </ul>
+
+  <p class="no-indent" style="font-weight:600; margin-left: 1.25cm;">2. ส่วนของเจ้าหน้าที่และผู้ดูแลระบบ (Admin / Staff) ผ่าน Web Admin Dashboard:</p>
+  <ul>
+    <li><strong>ระบบรักษาความปลอดภัย:</strong> เข้าสู่ระบบด้วย Email/Password พร้อมตรวจสอบสิทธิ์ Admin Custom Claims</li>
+    <li><strong>แดชบอร์ดสรุปสถิติภาพรวม (Real-time Overview):</strong> แสดงตัวเลขคิววันนี้, คิวรอยืนยัน, คิวกำลังนวด, คิวเสร็จสิ้น และจำนวนหมอนวด</li>
+    <li><strong>ระบบจัดการคิวงาน (Queue Management):</strong> มีปุ่มเรียกคิวถัดไป (Call Next) และปรับสถานะคิวงานได้ตามขั้นตอน</li>
+    <li><strong>ระบบจัดการข้อมูลหมอนวด (Therapist Management):</strong> เพิ่ม ลบ แก้ไข ข้อมูลหมอนวด ประสบการณ์ และสถานะความพร้อม</li>
+    <li><strong>ระบบติดตามการแจ้งเตือนลูกค้า:</strong> ตรวจสอบว่าลูกค้ารับทราบการเรียกคิวแล้วหรือไม่ หากยังไม่กดยืนยัน จะมีเบอร์โทรศัพท์ให้เจ้าหน้าที่โทรติดต่อได้ทันที</li>
+    <li><strong>ระบบส่งออกข้อมูลไปยัง Google Sheets:</strong> ซิงค์ข้อมูลการจองทั้งหมดไปยัง Google Spreadsheet อัตโนมัติด้วยคลิกเดียว</li>
+    <li><strong>ระบบส่งอีเมลแจ้งตารางงานหมอนวด:</strong> สรุปคิวงานประจำวันและส่งอีเมลแจ้งหมอนวดแต่ละท่านแยกรายบุคคลผ่าน SMTP</li>
+  </ul>
+</div>
+
+<!-- หน้าที่ 2 -->
+<div class="page">
+  <h3 class="subsection-title">3.1.2 ความต้องการเชิงไม่เกี่ยวข้องกับฟังก์ชัน (Non-Functional Requirements)</h3>
+  <ul>
+    <li><strong>ด้านความปลอดภัย (Security):</strong> ข้อมูลอัตลักษณ์ดิจิทัลผ่าน ThaiD รองรับมาตรฐาน OAuth 2.0 / OIDC ป้องกันการปลอมแปลง Token ด้วย JWKS Signature มีระบบป้องกัน API ด้วย <code>helmet</code> และ <code>express-rate-limit</code></li>
+    <li><strong>ด้านความถูกต้องและภาวะพร้อมกัน (Concurrency Control):</strong> ใช้ <strong>Firestore Transaction</strong> ควบคุมการจอง ป้องกันปัญหาการจองเวลาเดียวกันซ้ำซ้อน (Double Booking / Race Condition) 100%</li>
+    <li><strong>ด้านความเข้ากันได้และการตอบสนอง (Cross-Platform Usability):</strong> แอปพลิเคชันฝั่งลูกค้ารองรับการทำงานทั้งบน iOS, Android และ Web Browser ส่วนแดชบอร์ดของเจ้าหน้าที่รองรับหน้าจอคอมพิวเตอร์และแท็บเล็ต</li>
+  </ul>
+
+  <h2 class="section-title">3.2 แผนภาพกรณีการใช้งาน (Use Case Diagram)</h2>
+  <p>
+    แผนภาพกรณีการใช้งาน (Use Case Diagram) แสดงความสัมพันธ์ระหว่างกลุ่มผู้ใช้งาน (Actors) ได้แก่ <strong>ผู้ใช้บริการ (Customer)</strong>, <strong>ผู้ดูแลระบบ/เจ้าหน้าที่ (Admin/Staff)</strong> และระบบภายนอก (ThaiD, Google Sheets, Mail Server) กับฟังก์ชันหลักของระบบ ดังแสดงในภาพที่ 3.1
+  </p>
+
+  <div class="diagram-container">
+    <!-- SVG USE CASE DIAGRAM -->
+    <svg width="680" height="420" viewBox="0 0 680 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+          <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+        </filter>
+      </defs>
+      
+      <!-- System Boundary -->
+      <rect x="140" y="15" width="400" height="390" rx="12" fill="#fafdF8" stroke="#235c40" stroke-width="2" filter="url(#shadow)"/>
+      <rect x="140" y="15" width="400" height="28" rx="10" fill="#235c40"/>
+      <text x="340" y="34" font-family="'Prompt', sans-serif" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">ระบบจองคิวนวดแผนไทย ศูนย์สุขภาพชุมชนท่าวังหิน</text>
+
+      <!-- ACTOR LEFT: User -->
+      <!-- Actor Icon -->
+      <circle cx="65" cy="180" r="16" fill="#e8f5ed" stroke="#1b4d36" stroke-width="2"/>
+      <line x1="65" y1="196" x2="65" y2="230" stroke="#1b4d36" stroke-width="2.5"/>
+      <line x1="45" y1="210" x2="85" y2="210" stroke="#1b4d36" stroke-width="2.5"/>
+      <line x1="65" y1="230" x2="48" y2="260" stroke="#1b4d36" stroke-width="2.5"/>
+      <line x1="65" y1="230" x2="82" y2="260" stroke="#1b4d36" stroke-width="2.5"/>
+      <text x="65" y="280" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#1b4d36" text-anchor="middle">ผู้ใช้บริการ</text>
+      <text x="65" y="295" font-family="'Sarabun', sans-serif" font-size="11" fill="#666" text-anchor="middle">(Customer)</text>
+
+      <!-- ACTOR RIGHT: Admin -->
+      <circle cx="615" cy="180" r="16" fill="#e8f5ed" stroke="#1b4d36" stroke-width="2"/>
+      <line x1="615" y1="196" x2="615" y2="230" stroke="#1b4d36" stroke-width="2.5"/>
+      <line x1="595" y1="210" x2="635" y2="210" stroke="#1b4d36" stroke-width="2.5"/>
+      <line x1="615" y1="230" x2="598" y2="260" stroke="#1b4d36" stroke-width="2.5"/>
+      <line x1="615" y1="230" x2="632" y2="260" stroke="#1b4d36" stroke-width="2.5"/>
+      <text x="615" y="280" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#1b4d36" text-anchor="middle">เจ้าหน้าที่ / แอดมิน</text>
+      <text x="615" y="295" font-family="'Sarabun', sans-serif" font-size="11" fill="#666" text-anchor="middle">(Admin/Staff)</text>
+
+      <!-- USE CASES (Left Column - Customer) -->
+      <!-- UC1: Login -->
+      <ellipse cx="250" cy="65" rx="90" ry="18" fill="#ffffff" stroke="#2e7d52" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="250" y="70" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#123324" text-anchor="middle">UC-01: เข้าสู่ระบบ / ยืนยันตัวตน</text>
+
+      <!-- UC2: Services -->
+      <ellipse cx="250" cy="115" rx="90" ry="18" fill="#ffffff" stroke="#2e7d52" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="250" y="120" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#123324" text-anchor="middle">UC-02: เลือกดูบริการและหมอนวด</text>
+
+      <!-- UC3: Booking -->
+      <ellipse cx="250" cy="165" rx="90" ry="18" fill="#ffffff" stroke="#2e7d52" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="250" y="170" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="600" fill="#123324" text-anchor="middle">UC-03: จองคิวนวดแผนไทย</text>
+
+      <!-- UC4: Queue tracking -->
+      <ellipse cx="250" cy="215" rx="90" ry="18" fill="#ffffff" stroke="#2e7d52" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="250" y="220" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#123324" text-anchor="middle">UC-04: ติดตามสถานะคิวสด Real-time</text>
+
+      <!-- UC5: History & Cancel -->
+      <ellipse cx="250" cy="265" rx="90" ry="18" fill="#ffffff" stroke="#2e7d52" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="250" y="270" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#123324" text-anchor="middle">UC-05: ประวัติการจองและยกเลิกคิว</text>
+
+      <!-- UC6: Notification & Confirm -->
+      <ellipse cx="250" cy="315" rx="90" ry="18" fill="#ffffff" stroke="#2e7d52" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="250" y="320" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#123324" text-anchor="middle">UC-06: รับแจ้งเตือนและกดยืนยัน</text>
+
+      <!-- UC7: Phone Input -->
+      <ellipse cx="250" cy="365" rx="90" ry="18" fill="#ffffff" stroke="#2e7d52" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="250" y="370" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#123324" text-anchor="middle">UC-07: บันทึกเบอร์โทรศัพท์ติดต่อ</text>
+
+      <!-- USE CASES (Right Column - Admin) -->
+      <!-- UC8: Dashboard Overview -->
+      <ellipse cx="430" cy="65" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="430" y="70" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-08: ดูแดชบอร์ดสรุปสถิติภาพรวม</text>
+
+      <!-- UC9: Queue management & Call Next -->
+      <ellipse cx="430" cy="120" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="430" y="125" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="600" fill="#0f3750" text-anchor="middle">UC-09: จัดการคิวและเรียกคิวถัดไป</text>
+
+      <!-- UC10: Staff management -->
+      <ellipse cx="430" cy="180" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="430" y="185" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-10: จัดการข้อมูลแพทย์/หมอนวด</text>
+
+      <!-- UC11: Notification tracking -->
+      <ellipse cx="430" cy="240" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="430" y="245" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-11: ตรวจสอบการยืนยันของลูกค้า</text>
+
+      <!-- UC12: Sync Sheets -->
+      <ellipse cx="430" cy="300" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="430" y="305" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-12: ซิงค์ข้อมูล Google Sheets</text>
+
+      <!-- UC13: Email dispatch -->
+      <ellipse cx="430" cy="360" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
+      <text x="430" y="365" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-13: ส่งอีเมลแจ้งตารางงานหมอนวด</text>
+
+      <!-- CONNECTIONS (User -> UCs) -->
+      <line x1="85" y1="210" x2="160" y2="65" stroke="#2e7d52" stroke-width="1.2"/>
+      <line x1="85" y1="210" x2="160" y2="115" stroke="#2e7d52" stroke-width="1.2"/>
+      <line x1="85" y1="210" x2="160" y2="165" stroke="#2e7d52" stroke-width="1.5"/>
+      <line x1="85" y1="210" x2="160" y2="215" stroke="#2e7d52" stroke-width="1.2"/>
+      <line x1="85" y1="210" x2="160" y2="265" stroke="#2e7d52" stroke-width="1.2"/>
+      <line x1="85" y1="210" x2="160" y2="315" stroke="#2e7d52" stroke-width="1.2"/>
+      <line x1="85" y1="210" x2="160" y2="365" stroke="#2e7d52" stroke-width="1.2"/>
+
+      <!-- CONNECTIONS (Admin -> UCs) -->
+      <line x1="595" y1="210" x2="520" y2="65" stroke="#1a6e9e" stroke-width="1.2"/>
+      <line x1="595" y1="210" x2="520" y2="120" stroke="#1a6e9e" stroke-width="1.5"/>
+      <line x1="595" y1="210" x2="520" y2="180" stroke="#1a6e9e" stroke-width="1.2"/>
+      <line x1="595" y1="210" x2="520" y2="240" stroke="#1a6e9e" stroke-width="1.2"/>
+      <line x1="595" y1="210" x2="520" y2="300" stroke="#1a6e9e" stroke-width="1.2"/>
+      <line x1="595" y1="210" x2="520" y2="360" stroke="#1a6e9e" stroke-width="1.2"/>
+    </svg>
+    <div class="diagram-caption">ภาพที่ 3.1 แผนภาพกรณีการใช้งาน (Use Case Diagram) ของระบบจองคิวนวดแผนไทย</div>
+  </div>
+</div>
+
+<!-- หน้าที่ 3: Use Case Descriptions -->
+<div class="page">
+  <h2 class="section-title">3.3 รายละเอียดกรณีการใช้งาน (Use Case Descriptions)</h2>
+  <p>
+    ตารางอธิบายรายละเอียดกรณีการใช้งานระบุขั้นตอนการทำงาน เงื่อนไข และการจัดการข้อผิดพลาดในแต่ละฟังก์ชัน:
+  </p>
+
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.1 รายละเอียด Use Case: UC-01 การเข้าสู่ระบบและยืนยันตัวตน (Authentication)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-01</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การเข้าสู่ระบบและยืนยันตัวตน (Authentication)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ใช้บริการ (Customer), ผู้ดูแลระบบ (Admin), ระบบ ThaiD DOPA</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อระบุตัวตนและออก Token สิทธิ์การเข้าถึงระบบที่ปลอดภัย</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>ผู้ใช้งานเปิดแอปพลิเคชัน Flutter หรือเปิดหน้า Web Admin Dashboard</td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>ระบบออก Authentication Token และนำผู้ใช้เข้าสู่หน้าจอตามสิทธิ์การใช้งาน</td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. ผู้ใช้เลือกวิธีการเข้าสู่ระบบ (ThaiD Digital ID / Phone OTP / บัญชีผู้ดูแลระบบ)<br>
+        2. <strong>กรณี ThaiD:</strong> ระบบนำไปยังหน้ายืนยันตัวตน ThaiD &rarr; ตรวจสอบ JWKS Signature &rarr; ออก Firebase Custom Token &rarr; นำผู้ใช้กลับเข้าสู่แอปพลิเคชัน<br>
+        3. <strong>กรณี Phone OTP:</strong> ผู้ใช้กรอกเบอร์โทร &rarr; รับรหัส OTP 6 หลัก &rarr; กรอกยืนยัน<br>
+        4. <strong>กรณี Admin:</strong> เจ้าหน้าที่กรอก Email และ Password &rarr; ตรวจสอบ Claim <code>admin: true</code><br>
+        5. ระบบบันทึกสถานะการล็อกอินและนำผู้ใช้เข้าสู่หน้าจอหลัก
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        2a. การยืนยันตัวตน ThaiD ไม่สำเร็จหรือถูกยกเลิก: ระบบแสดงแจ้งเตือนและกลับมาหน้าล็อกอินเดิม<br>
+        4a. รหัสผ่านไม่ถูกต้อง หรือไม่มีสิทธิ์ Admin: ระบบแสดงข้อความปฏิเสธการเข้าถึง
+      </td></tr>
+    </table>
+  </div>
+
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.2 รายละเอียด Use Case: UC-03 การจองคิวนวดแผนไทย (Booking & Slot Validation)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-03</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การจองคิวนวดแผนไทย (Booking & Slot Validation)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ใช้บริการ (Customer)</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อส่งคำขอจองคิวนวดแผนไทยในวันและเวลาที่ต้องการ</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>ผู้ใช้เข้าสู่ระบบเรียบร้อยแล้ว และมีเบอร์โทรศัพท์ในระบบ</td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>ข้อมูลการจองถูกบันทึกลงใน Firestore, สร้างหมายเลขคิวประจำวัน และสถานะเป็น <code>pending</code></td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. ผู้ใช้เลือกแพ็กเกจบริการนวดแผนไทย (เช่น นวดเพื่อสุขภาพ, นวดประคบสมุนไพร)<br>
+        2. ผู้ใช้เลือกวันที่รับบริการ (จองล่วงหน้าได้ไม่เกิน 3 วันตามเกณฑ์ศูนย์)<br>
+        3. ผู้ใช้เลือกช่วงเวลา (Time Slot) และเลือกหมอนวดที่ต้องการ (ระบุหรือไม่ระบุก็ได้)<br>
+        4. ผู้ใช้กดยืนยันการจองคิว<br>
+        5. Backend ประมวลผลผ่าน <strong>Firestore Transaction</strong> ตรวจสอบว่าช่วงเวลาว่างอยู่หรือไม่<br>
+        6. ระบบสร้างรหัสคิวใหม่ประจำวัน (เช่น A001, A002) และบันทึกข้อมูลการจอง<br>
+        7. ระบบแสดงหน้ายืนยันการจองสำเร็จ พร้อมบัตรคิวอิเล็กทรอนิกส์
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        5a. ช่วงเวลาดังกล่าวถูกผู้อื่นจองไปแล้วในเสี้ยววินาทีเดียวกัน (Conflict 409): ระบบยกเลิก Transaction และแจ้งเตือน "เวลานี้ถูกจองแล้ว กรุณาเลือกช่วงเวลาอื่น"
+      </td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- หน้าที่ 4: Use Case Descriptions (ต่อ) -->
+<div class="page">
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.3 รายละเอียด Use Case: UC-04 การติดตามสถานะคิวสด (Live Queue Tracking)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-04</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การติดตามสถานะคิวสด (Live Queue Tracking)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ใช้บริการ (Customer)</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อให้ผู้รับบริการทราบลำดับคิวปัจจุบันและประเมินเวลาในการเดินทางมารับบริการ</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>ผู้ใช้มีรายการจองในวันปัจจุบันที่มีสถานะ <code>pending</code> หรือ <code>confirmed</code></td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>แอปพลิเคชันแสดงหมายเลขคิวปัจจุบัน จำนวนคิวก่อนหน้า และเวลาคาดการณ์</td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. ผู้ใช้เข้าสู่หน้า "คิวของฉัน" (Queue Screen)<br>
+        2. แอปพลิเคชันส่ง Request <code>GET /api/queue/my</code><br>
+        3. ระบบคำนวณจำนวนคิวก่อนหน้า (Queues Ahead) และเวลาที่ต้องรอโดยประมาณ<br>
+        4. แอปพลิเคชันแสดงผลหมายเลขคิวปัจจุบันที่กำลังรับบริการ และสถานะคิวของผู้ใช้แบบ Real-time
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        2a. ผู้ใช้ไม่มีคิวในวันปัจจุบัน: ระบบแสดงข้อความ "ไม่มีคิวที่กำลังรอรับบริการในวันนี้" พร้อมปุ่มแนะนำให้ไปหน้าจองคิว
+      </td></tr>
+    </table>
+  </div>
+
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.4 รายละเอียด Use Case: UC-06 การรับแจ้งเตือนและกดยืนยันรับทราบ (Notification & Acknowledgement)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-06</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การรับแจ้งเตือนและกดยืนยันรับทราบ (Notification & Acknowledgement)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ใช้บริการ (Customer), ผู้ดูแลระบบ (Admin)</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อแจ้งเตือนเมื่อถึงคิว และให้ลูกค้ายืนยันรับทราบเพื่อลดภาระเจ้าหน้าที่ในการโทรติดตาม</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>เจ้าหน้าที่มีการกดเรียกคิว หรือระบบมีการสร้าง Notification ให้แก่ผู้ใช้</td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>สถานะ Notification เปลี่ยนเป็น <code>confirmed: true</code> พร้อมบันทึกเวลาที่กดยืนยัน</td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. เมื่อเจ้าหน้าที่เรียกคิว ระบบจะสร้างการแจ้งเตือน "ถึงคิวของคุณแล้ว"<br>
+        2. แอปพลิเคชันของผู้ใช้แสดง Badge ตัวเลขแจ้งเตือนที่ไอคอนกระดิ่ง<br>
+        3. ผู้ใช้เปิดหน้ารายการแจ้งเตือน และกดปุ่ม <strong>"รับทราบแล้ว"</strong><br>
+        4. ระบบส่ง Request ไปยัง <code>POST /api/notifications/:id/confirm</code><br>
+        5. สถานะในระบบแอดมินจะอัปเดตเป็น "ลูกค้ารับทราบแล้ว" เจ้าหน้าที่ไม่ต้องโทรติดตามซ้ำ
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        3a. ผู้ใช้ไม่กดยืนยัน: หน้าจอ Web Admin จะคงสถานะ "ยังไม่ยืนยัน" พร้อมแสดงเบอร์โทรศัพท์เพื่อให้เจ้าหน้าที่โทรติดต่อโดยตรง
+      </td></tr>
+    </table>
+  </div>
+
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.5 รายละเอียด Use Case: UC-09 การจัดการคิวและเรียกคิวถัดไป (Queue Management & Call Next)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-09</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การจัดการคิวและเรียกคิวถัดไป (Queue Management & Call Next)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ดูแลระบบ / เจ้าหน้าที่ (Admin / Staff)</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อควบคุมลำดับการให้บริการ ปรับสถานะการจอง และเรียกคิวถัดไป</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>เจ้าหน้าที่เข้าสู่ระบบ Web Admin สำเร็จ</td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>สถานะคิวในระบบเปลี่ยนแปลง และส่งสัญญาณแจ้งเตือนไปยังผู้ใช้</td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. เจ้าหน้าที่เปิดหน้า "จัดการคิว" หรือ "แดชบอร์ด"<br>
+        2. เจ้าหน้าที่กดปุ่ม <strong>"เรียกคิวถัดไป (Call Next)"</strong> หรือเลือกคิวที่ต้องการปรับสถานะ<br>
+        3. ระบบค้นหาคิวถัดไปที่รออยู่ตามลำดับเวลา และเปลี่ยนสถานะเป็น <code>in_service</code><br>
+        4. ระบบอัปเดต <code>queue_status</code> ประจำวัน และสร้าง Notification แจ้งเตือนไปยังลูกค้า<br>
+        5. เมื่อให้บริการเสร็จสิ้น เจ้าหน้าที่กดเปลี่ยนสถานะเป็น <code>done</code>
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        3a. ไม่มีคิวรอรับบริการ: ระบบแสดงข้อความแจ้งเตือน "ไม่มีคิวที่รอรับบริการแล้ว"
+      </td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- หน้าที่ 5: Use Case Descriptions (ต่อ) -->
+<div class="page">
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.6 รายละเอียด Use Case: UC-10 การจัดการข้อมูลแพทย์/หมอนวด (Therapist Management)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-10</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การจัดการข้อมูลแพทย์/หมอนวด (Therapist Management)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ดูแลระบบ (Admin)</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อเพิ่ม ลบ แก้ไข ข้อมูลหมอนวด ประสบการณ์ รูปถ่าย และสถานะความพร้อม</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>ผู้ดูแลระบบเข้าสู่ระบบ Web Admin Dashboard เรียบร้อยแล้ว</td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>ข้อมูลใน Collection <code>staff</code> ได้รับการปรับปรุงในฐานข้อมูล</td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. เจ้าหน้าที่เปิดแท็บ "แพทย์/หมอนวด" บน Web Admin<br>
+        2. สามารถเลือกกด "+ เพิ่มหมอนวดใหม่" หรือกด "แก้ไขข้อมูล" ในการ์ดหมอนวดแต่ละคน<br>
+        3. กรอกข้อมูล: ชื่อ-นามสกุล, อีเมล (สำหรับรับตารางงาน), ประสบการณ์, URL รูปภาพ<br>
+        4. เลือกปรับสถานะการทำงาน (<code>available</code>, <code>busy</code>, <code>break</code>, <code>off</code>)<br>
+        5. กดยืนยันบันทึกข้อมูล &rarr; ระบบอัปเดตข้อมูลบนฐานข้อมูลแบบเรียลไทม์
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        3a. รูปแบบอีเมลไม่ถูกต้อง: ระบบแสดงแจ้งเตือน "รูปแบบอีเมลไม่ถูกต้อง" และไม่อนุญาตให้บันทึก
+      </td></tr>
+    </table>
+  </div>
+
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.7 รายละเอียด Use Case: UC-12 การซิงค์ข้อมูล Google Sheets (Google Sheets Sync)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-12</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การซิงค์ข้อมูลไปยัง Google Sheets (Google Sheets Sync)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ดูแลระบบ (Admin), ระบบ Google Sheets API</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อส่งออกข้อมูลการจองทั้งหมดสำหรับทำรายงานทางสถิติของศูนย์สุขภาพ</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>มีการตั้งค่า Service Account และ Spreadsheet ID ในระบบเรียบร้อยแล้ว</td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>แผ่นงาน <code>Bookings</code> ใน Google Sheets ได้รับการอัปเดตข้อมูลแถวใหม่ล่าสุด</td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. ผู้ดูแลระบบกดปุ่ม <strong>"Sync to Google Sheets"</strong> บนแถบด้านบนของ Web Admin<br>
+        2. Backend ดึงข้อมูลรายการจองทั้งหมด พร้อม Map ชื่อหมอนวดและข้อมูลติดต่อผู้ใช้<br>
+        3. Backend เชื่อมต่อกับ Google Sheets API v4 ผ่าน JWT Authentication<br>
+        4. ระบบทำการเขียนข้อมูล Header และบันทึกแถวข้อมูลการจองทั้งหมดลงในตารางสเปรดชีต<br>
+        5. Web Admin แสดงผลลัพธ์แจ้งเตือน "ซิงค์ข้อมูลสำเร็จ" พร้อมจำนวนแถวข้อมูลที่ถูกส่งออก
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        3a. ไม่ได้ตั้งค่า Credential หรือสิทธิ์เข้าถึงไม่ถูกต้อง: ระบบตอบกลับ Error 500 พร้อมแจ้งสาเหตุ
+      </td></tr>
+    </table>
+  </div>
+
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.8 รายละเอียด Use Case: UC-13 การส่งอีเมลแจ้งตารางงานหมอนวด (Therapist Email Dispatch)</div>
+    <table class="academic-table">
+      <tr><td class="col-head">รหัส Use Case</td><td>UC-13</td></tr>
+      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การส่งอีเมลแจ้งตารางงานหมอนวด (Therapist Email Dispatch)</td></tr>
+      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ดูแลระบบ (Admin), ระบบ Mail Server (Nodemailer / Gmail SMTP)</td></tr>
+      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อส่งตารางคิวนัดหมายประจำวันให้แก่หมอนวดแต่ละคนแยกรายบุคคล</td></tr>
+      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>หมอนวดมีข้อมูลอีเมลที่ถูกต้องในระบบ และมีคิวการจองในวันที่เลือก</td></tr>
+      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>อีเมลสรุปตารางงานถูกส่งเข้ากล่องข้อความของหมอนวดแต่ละคน</td></tr>
+      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
+        1. ผู้ดูแลระบบกดปุ่ม <strong>"Email หมอนวด"</strong> บน Web Admin<br>
+        2. Backend ดึงรายการจองของวันปัจจุบันที่สถานะเป็น <code>pending</code> หรือ <code>confirmed</code><br>
+        3. ระบบจัดกลุ่มการจองแยกตามหมอนวดแต่ละคน (Group by Staff ID)<br>
+        4. ระบบสร้างเทมเพลต HTML ตารางสรุปเวลา, เลขคิว, บริการ และชื่อลูกค้า<br>
+        5. ส่งอีเมลผ่าน Nodemailer ไปยังหมอนวดแต่ละท่านที่มีคิวงาน<br>
+        6. Web Admin แสดงรายงานสรุปผลการส่งอีเมล (จำนวนที่ส่งสำเร็จและรายชื่อผู้รับ)
+      </td></tr>
+      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
+        3a. หมอนวดท่านใดไม่มีคิวในวันนั้น: ระบบจะไม่ส่งอีเมลหาหมอนวดท่านนั้นเพื่อไม่ให้เกิดความสับสน
+      </td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- หน้าที่ 6: Sequence Diagram 1 -->
+<div class="page">
+  <h2 class="section-title">3.4 แผนภาพลำดับการทำงาน (Sequence Diagrams) พร้อมอธิบายหลักการทำงาน</h2>
+  <p>
+    แผนภาพลำดับการทำงาน (Sequence Diagram) แสดงปฏิสัมพันธ์และการแลกเปลี่ยนข้อความ (Messages) ระหว่างอ็อบเจกต์ในระบบตามลำดับเวลา เพื่ออธิบายกระบวนการทำงานหลักอย่างชัดเจน:
+  </p>
+
+  <h3 class="subsection-title">3.4.1 Sequence Diagram: กระบวนการยืนยันตัวตนผ่าน ThaiD Digital ID (OIDC Authentication)</h3>
+  <p>
+    แสดงขั้นตอนการเข้าสู่ระบบด้วยอัตลักษณ์ดิจิทัล ThaiD ซึ่งใช้มาตรฐาน OpenID Connect ร่วมกับกลไก PKCE (Proof Key for Code Exchange) และการตรวจสอบกุญแจสาธารณะ JWKS ดังแสดงในภาพที่ 3.2
+  </p>
+
+  <div class="diagram-container">
+    <!-- SVG SEQUENCE DIAGRAM 1 -->
+    <svg width="680" height="340" viewBox="0 0 680 340" xmlns="http://www.w3.org/2000/svg">
+      <!-- Lifelines -->
+      <rect x="20" y="10" width="80" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="60" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Customer</text>
+      <line x1="60" y1="40" x2="60" y2="330" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="150" y="10" width="90" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="195" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Flutter App</text>
+      <line x1="195" y1="40" x2="195" y2="330" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="290" y="10" width="100" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="340" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Express API</text>
+      <line x1="340" y1="40" x2="340" y2="330" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="440" y="10" width="90" height="30" rx="6" fill="#fee2e2" stroke="#991b1b" stroke-width="1.5"/>
+      <text x="485" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#991b1b" text-anchor="middle">ThaiD DOPA</text>
+      <line x1="485" y1="40" x2="485" y2="330" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="570" y="10" width="90" height="30" rx="6" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+      <text x="615" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#b45309" text-anchor="middle">Firebase Auth</text>
+      <line x1="615" y1="40" x2="615" y2="330" stroke="#888" stroke-dasharray="4,4"/>
+
+      <!-- Arrows -->
+      <!-- 1 -->
+      <line x1="60" y1="65" x2="195" y2="65" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="195,65 187,61 187,69" fill="#1b4d36"/>
+      <text x="127" y="60" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">1. กดปุ่ม Login ThaiD</text>
+
+      <!-- 2 -->
+      <line x1="195" y1="90" x2="340" y2="90" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="340,90 332,86 332,94" fill="#1b4d36"/>
+      <text x="267" y="85" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">2. GET /api/auth/thaid</text>
+
+      <!-- 3 -->
+      <line x1="340" y1="115" x2="485" y2="115" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="485,115 477,111 477,119" fill="#1b4d36"/>
+      <text x="412" y="110" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">3. Redirect (Auth URL + PKCE)</text>
+
+      <!-- 4 -->
+      <line x1="60" y1="140" x2="485" y2="140" stroke="#991b1b" stroke-width="1.5"/>
+      <polygon points="485,140 477,136 477,144" fill="#991b1b"/>
+      <text x="272" y="135" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#991b1b" text-anchor="middle">4. ผู้ใช้สแกน QR Code / ยืนยันบนแอป ThaiD</text>
+
+      <!-- 5 -->
+      <line x1="485" y1="170" x2="340" y2="170" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="340,170 348,166 348,174" fill="#1b4d36"/>
+      <text x="412" y="165" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">5. Callback (Code + State)</text>
+
+      <!-- 6 -->
+      <line x1="340" y1="195" x2="485" y2="195" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="485,195 477,191 477,199" fill="#1b4d36"/>
+      <text x="412" y="190" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">6. แลก Token (PKCE Verifier)</text>
+
+      <!-- 7 -->
+      <line x1="485" y1="220" x2="340" y2="220" stroke="#1b4d36" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <polygon points="340,220 348,216 348,224" fill="#1b4d36"/>
+      <text x="412" y="215" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">7. ส่ง ID Token (JWT)</text>
+
+      <!-- 8 -->
+      <line x1="340" y1="245" x2="615" y2="245" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="615,245 607,241 607,249" fill="#b45309"/>
+      <text x="477" y="240" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">8. ตรวจ JWKS &amp; สร้าง Custom Token</text>
+
+      <!-- 9 -->
+      <line x1="340" y1="275" x2="195" y2="275" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="195,275 203,271 203,279" fill="#1b4d36"/>
+      <text x="267" y="270" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">9. Redirect พร้อมแนบ Token</text>
+
+      <!-- 10 -->
+      <line x1="195" y1="300" x2="615" y2="300" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="615,300 607,296 607,304" fill="#b45309"/>
+      <text x="405" y="295" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">10. signInWithCustomToken() สำเร็จ</text>
+    </svg>
+    <div class="diagram-caption">ภาพที่ 3.2 Sequence Diagram แสดงกระบวนการเข้าสู่ระบบผ่าน ThaiD Digital ID</div>
+  </div>
+
+  <p class="no-indent" style="font-weight:600;">คำอธิบายหลักการทำงานของกระบวนการยืนยันตัวตน ThaiD:</p>
+  <ol>
+    <li>ผู้ใช้บริการกดปุ่ม "เข้าสู่ระบบด้วย ThaiD" บนแอปพลิเคชัน Flutter</li>
+    <li>แอปพลิเคชันส่ง Request ไปยัง Express Backend ที่ Endpoint <code>/api/auth/thaid</code></li>
+    <li>Backend ทำ OIDC Discovery, สร้างรหัสลับ <code>state</code> ป้องกัน CSRF และสร้างคู่รหัส PKCE (<code>code_verifier</code> และ <code>code_challenge</code> ด้วยอัลกอริทึม SHA-256) จากนั้น Redirect ผู้ใช้ไปยังหน้ายืนยันตัวตนของ ThaiD DOPA</li>
+    <li>ผู้ใช้ยืนยันตัวตนบนแอปพลิเคชัน ThaiD ในสมาร์ตโฟน</li>
+    <li>ระบบ ThaiD ส่ง Authorization Code และ State กลับมายัง Callback Endpoint ของ Server</li>
+    <li>Server ส่ง Authorization Code พร้อม <code>code_verifier</code> ไปแลกเปลี่ยน Token ผ่าน HTTP Basic Authentication</li>
+    <li>ThaiD ส่ง ID Token (JWT) กลับมาให้ Server</li>
+    <li>Server ตรวจสอบลายเซ็นของ ID Token ด้วยกุญแจสาธารณะ (JWKS) ของกรมการปกครอง ตรวจสอบความถูกต้องของเลขบัตรประชาชน (PID) และสร้าง Firebase Custom Token</li>
+    <li>Server Redirect ผู้ใช้กลับมายังแอปพลิเคชัน Flutter พร้อมแนบ Token ใน URL</li>
+    <li>แอปพลิเคชันนำ Custom Token ไปล็อกอินผ่าน Firebase Authentication เพื่อสร้าง Session การใช้งานที่สมบูรณ์</li>
+  </ol>
+</div>
+
+<!-- หน้าที่ 7: Sequence Diagram 2 -->
+<div class="page">
+  <h3 class="subsection-title">3.4.2 Sequence Diagram: กระบวนการจองคิวและการจัดการความพร้อมกัน (Concurrency Booking)</h3>
+  <p>
+    แสดงขั้นตอนการจองคิวซึ่งใช้เทคนิค <strong>Firestore Transaction</strong> เพื่อป้องกันไม่ให้เกิดการจองช่วงเวลาเดียวกันและหมอนวดคนเดียวกันซ้ำซ้อน (Double Booking Prevention) ดังแสดงในภาพที่ 3.3
+  </p>
+
+  <div class="diagram-container">
+    <!-- SVG SEQUENCE DIAGRAM 2 -->
+    <svg width="680" height="330" viewBox="0 0 680 330" xmlns="http://www.w3.org/2000/svg">
+      <!-- Lifelines -->
+      <rect x="30" y="10" width="80" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="70" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Customer</text>
+      <line x1="70" y1="40" x2="70" y2="320" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="180" y="10" width="90" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="225" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Flutter App</text>
+      <line x1="225" y1="40" x2="225" y2="320" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="340" y="10" width="100" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="390" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Booking Route</text>
+      <line x1="390" y1="40" x2="390" y2="320" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="520" y="10" width="110" height="30" rx="6" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+      <text x="575" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#b45309" text-anchor="middle">Firestore Database</text>
+      <line x1="575" y1="40" x2="575" y2="320" stroke="#888" stroke-dasharray="4,4"/>
+
+      <!-- Arrows -->
+      <line x1="70" y1="65" x2="225" y2="65" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="225,65 217,61 217,69" fill="#1b4d36"/>
+      <text x="147" y="60" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">1. เลือกวัน เวลา หมอนวด &amp; กดยืนยัน</text>
+
+      <line x1="225" y1="95" x2="390" y2="95" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="390,95 382,91 382,99" fill="#1b4d36"/>
+      <text x="307" y="90" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">2. POST /api/bookings (Bearer Token)</text>
+
+      <line x1="390" y1="125" x2="575" y2="125" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="575,125 567,121 567,129" fill="#b45309"/>
+      <text x="482" y="120" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">3. db.runTransaction()</text>
+
+      <line x1="390" y1="155" x2="575" y2="155" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="575,155 567,151 567,159" fill="#b45309"/>
+      <text x="482" y="150" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">4. ตรวจสอบคิวซ้ำ (Date, Time, Staff)</text>
+
+      <line x1="575" y1="185" x2="390" y2="185" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4,4"/>
+      <polygon points="390,185 398,181 398,189" fill="#b45309"/>
+      <text x="482" y="180" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">5. ผลการตรวจสอบ (ว่าง / ไม่ว่าง)</text>
+
+      <line x1="390" y1="215" x2="575" y2="215" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="575,215 567,211 567,219" fill="#b45309"/>
+      <text x="482" y="210" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">6. อ่าน Counter + เพิ่มคิว A00x</text>
+
+      <line x1="390" y1="245" x2="575" y2="245" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="575,245 567,241 567,249" fill="#b45309"/>
+      <text x="482" y="240" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">7. บันทึก Document ลง 'bookings'</text>
+
+      <line x1="390" y1="275" x2="225" y2="275" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="225,275 233,271 233,279" fill="#1b4d36"/>
+      <text x="307" y="270" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">8. ตอบกลับสถานะ 201 Created</text>
+
+      <line x1="225" y1="300" x2="70" y2="300" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="70,300 78,296 78,304" fill="#1b4d36"/>
+      <text x="147" y="295" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">9. แสดงบัตรคิวและรายละเอียดนัดหมาย</text>
+    </svg>
+    <div class="diagram-caption">ภาพที่ 3.3 Sequence Diagram แสดงกระบวนการจองคิวนวดแผนไทยแบบ Concurrency Transaction</div>
+  </div>
+
+  <p class="no-indent" style="font-weight:600;">คำอธิบายหลักการทำงานของกระบวนการจองคิว:</p>
+  <ol>
+    <li>ผู้ใช้บริการเลือกบริการนวด, วันที่, ช่วงเวลา และหมอนวดที่ต้องการ จากนั้นกดยืนยันการจอง</li>
+    <li>แอปพลิเคชันส่ง Request <code>POST /api/bookings</code> พร้อมแนบ Firebase Bearer Token ใน Authorization Header</li>
+    <li>Server เริ่มการทำงานแบบ Atomic ผ่าน <code>db.runTransaction()</code></li>
+    <li>ระบบทำการ Query ค้นหารายการจองในวัน เวลา และหมอนวดคนดังกล่าวที่มีสถานะ <code>pending</code> หรือ <code>confirmed</code></li>
+    <li>หากพบว่ามีการจองซ้ำซ้อน Transaction จะถูกยกเลิก (Rollback) ทันที และส่งรหัส Error 409 Conflict กลับไปยังแอปพลิเคชัน</li>
+    <li>หากช่วงเวลาว่าง ระบบจะดึงค่าจาก Collection <code>counters</code> ประจำวัน เพื่อนำมาสร้างหมายเลขคิวลำดับถัดไป (เช่น A001, A002)</li>
+    <li>ระบบเขียนเอกสารการจองใหม่ลงใน Collection <code>bookings</code> พร้อมบันทึกเวลา Server Timestamp</li>
+    <li>เมื่อ Commit สำเร็จ Server จะส่งข้อมูลการจองพร้อมรหัสคิวกลับไปยังแอปพลิเคชันด้วยสถานะ 201 Created</li>
+    <li>แอปพลิเคชันอัปเดต State ภายในและแสดงผลบัตรคิวให้ผู้รับบริการทราบทันที</li>
+  </ol>
+</div>
+
+<!-- หน้าที่ 8: Sequence Diagram 3 & 4 -->
+<div class="page">
+  <h3 class="subsection-title">3.4.3 Sequence Diagram: กระบวนการเรียกคิวและการแจ้งเตือนลูกค้ายืนยันรับทราบ</h3>
+  <p>
+    แสดงขั้นตอนเมื่อเจ้าหน้าที่กดเรียกคิว ระบบจะส่งสัญญาณแจ้งเตือนไปยังแอปพลิเคชันลูกค้า และรับการกดยืนยันรับทราบกลับมาที่แดชบอร์ด ดังแสดงในภาพที่ 3.4
+  </p>
+
+  <div class="diagram-container">
+    <!-- SVG SEQUENCE DIAGRAM 3 -->
+    <svg width="680" height="280" viewBox="0 0 680 280" xmlns="http://www.w3.org/2000/svg">
+      <!-- Lifelines -->
+      <rect x="25" y="10" width="80" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="65" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Admin/Staff</text>
+      <line x1="65" y1="40" x2="65" y2="270" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="160" y="10" width="90" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="205" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Web Admin</text>
+      <line x1="205" y1="40" x2="205" y2="270" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="310" y="10" width="100" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="360" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Queue API</text>
+      <line x1="360" y1="40" x2="360" y2="270" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="460" y="10" width="90" height="30" rx="6" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+      <text x="505" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#b45309" text-anchor="middle">Firestore</text>
+      <line x1="505" y1="40" x2="505" y2="270" stroke="#888" stroke-dasharray="4,4"/>
+
+      <rect x="580" y="10" width="80" height="30" rx="6" fill="#eaf3ed" stroke="#1b4d36" stroke-width="1.5"/>
+      <text x="620" y="30" font-family="'Prompt', sans-serif" font-size="11" font-weight="600" fill="#1b4d36" text-anchor="middle">Customer</text>
+      <line x1="620" y1="40" x2="620" y2="270" stroke="#888" stroke-dasharray="4,4"/>
+
+      <!-- Arrows -->
+      <line x1="65" y1="65" x2="205" y2="65" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="205,65 197,61 197,69" fill="#1b4d36"/>
+      <text x="135" y="60" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">1. กดปุ่ม 'เรียกคิวถัดไป'</text>
+
+      <line x1="205" y1="90" x2="360" y2="90" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="360,90 352,86 352,94" fill="#1b4d36"/>
+      <text x="282" y="85" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">2. POST /api/queue/call-next</text>
+
+      <line x1="360" y1="120" x2="505" y2="120" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="505,120 497,116 497,124" fill="#b45309"/>
+      <text x="432" y="115" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">3. Batch Update (Status &amp; Notif)</text>
+
+      <line x1="505" y1="150" x2="620" y2="150" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="620,150 612,146 612,154" fill="#1b4d36"/>
+      <text x="562" y="145" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">4. แจ้งเตือนถึงคิวบนแอป</text>
+
+      <line x1="620" y1="180" x2="360" y2="180" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="360,180 368,176 368,184" fill="#1b4d36"/>
+      <text x="490" y="175" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">5. ลูกค้ากดปุ่ม 'รับทราบแล้ว' (/confirm)</text>
+
+      <line x1="360" y1="210" x2="505" y2="210" stroke="#b45309" stroke-width="1.5"/>
+      <polygon points="505,210 497,206 497,214" fill="#b45309"/>
+      <text x="432" y="205" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#b45309" text-anchor="middle">6. อัปเดต confirmed = true</text>
+
+      <line x1="360" y1="240" x2="205" y2="240" stroke="#1b4d36" stroke-width="1.5"/>
+      <polygon points="205,240 213,236 213,244" fill="#1b4d36"/>
+      <text x="282" y="235" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#1b4d36" text-anchor="middle">7. Web Admin แสดงสถานะ 'รับทราบแล้ว'</text>
+    </svg>
+    <div class="diagram-caption">ภาพที่ 3.4 Sequence Diagram แสดงกระบวนการเรียกคิวและกดยืนยันรับทราบการแจ้งเตือน</div>
+  </div>
+
+  <p class="no-indent" style="font-weight:600;">คำอธิบายหลักการทำงาน:</p>
+  <p>
+    เมื่อเจ้าหน้าที่กดปุ่ม "เรียกคิวถัดไป" บน Web Admin ระบบจะส่งคำขอไปยัง Backend เพื่อค้นหาคิวที่รออยู่ตามลำดับเวลา และปรับสถานะเป็น <code>in_service</code> พร้อมทั้งอัปเดตเอกสาร <code>queue_status</code> ประจำวัน และสร้างข้อความแจ้งเตือนลง Collection <code>notifications</code> ฝั่งแอปพลิเคชันลูกค้าจะแสดง Badge แจ้งเตือน เมื่อลูกค้ากดปุ่ม "รับทราบแล้ว" ระบบจะส่งคำขอยืนยันกลับมาอัปเดต <code>confirmed = true</code> ทำให้เจ้าหน้าที่บน Web Admin ทราบทันทีว่าลูกค้ากำลังเดินเข้าห้องนวด โดยไม่ต้องโทรติดตามซ้ำ
+  </p>
+</div>
+
+<!-- หน้าที่ 9: ER Diagram & Relationships -->
+<div class="page">
+  <h2 class="section-title">3.5 แผนภาพความสัมพันธ์ของข้อมูล (Entity-Relationship Diagram: ER Diagram)</h2>
+  <p>
+    แผนภาพ ER Diagram แสดงโครงสร้างความสัมพันธ์ระหว่างเอนทิตี (Entities), คุณลักษณะ (Attributes), คีย์หลัก (Primary Keys), คีย์นอก (Foreign Keys) และความสัมพันธ์เชิงจำนวน (Cardinality) ของระบบจองคิวนวดแผนไทย ดังแสดงในภาพที่ 3.5
+  </p>
+
+  <div class="diagram-container">
+    <!-- SVG ER DIAGRAM -->
+    <svg width="680" height="430" viewBox="0 0 680 430" xmlns="http://www.w3.org/2000/svg">
+      <!-- Entity: USERS -->
+      <rect x="20" y="30" width="180" height="150" rx="6" fill="#ffffff" stroke="#235c40" stroke-width="1.8" filter="url(#shadow)"/>
+      <rect x="20" y="30" width="180" height="26" rx="5" fill="#235c40"/>
+      <text x="110" y="48" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">USERS (ผู้ใช้งาน)</text>
+      <text x="30" y="75" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#991b1b">[PK] uid : String</text>
+      <text x="30" y="95" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">pid : String (13 หลัก)</text>
+      <text x="30" y="115" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">name : String</text>
+      <text x="30" y="135" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">phone : String</text>
+      <text x="30" y="155" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">loginMethod : String</text>
+      <text x="30" y="172" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#777">updatedAt : Timestamp</text>
+
+      <!-- Entity: SERVICES -->
+      <rect x="250" y="30" width="180" height="150" rx="6" fill="#ffffff" stroke="#235c40" stroke-width="1.8" filter="url(#shadow)"/>
+      <rect x="250" y="30" width="180" height="26" rx="5" fill="#235c40"/>
+      <text x="340" y="48" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">SERVICES (บริการ)</text>
+      <text x="260" y="75" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#991b1b">[PK] id : String</text>
+      <text x="260" y="95" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">name : String</text>
+      <text x="260" y="115" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">duration : Number (นาที)</text>
+      <text x="260" y="135" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">price : Number (บาท)</text>
+      <text x="260" y="155" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">description : String</text>
+      <text x="260" y="172" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#777">active : Boolean</text>
+
+      <!-- Entity: STAFF -->
+      <rect x="480" y="30" width="180" height="150" rx="6" fill="#ffffff" stroke="#235c40" stroke-width="1.8" filter="url(#shadow)"/>
+      <rect x="480" y="30" width="180" height="26" rx="5" fill="#235c40"/>
+      <text x="570" y="48" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">STAFF (หมอนวด)</text>
+      <text x="490" y="75" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#991b1b">[PK] id : String</text>
+      <text x="490" y="95" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">name : String</text>
+      <text x="490" y="115" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">email : String</text>
+      <text x="490" y="135" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">experience : String</text>
+      <text x="490" y="155" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">photo : String (URL)</text>
+      <text x="490" y="172" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#777">status : String / active</text>
+
+      <!-- Entity: BOOKINGS (Center Bottom) -->
+      <rect x="235" y="240" width="210" height="175" rx="6" fill="#ffffff" stroke="#1a6e9e" stroke-width="2" filter="url(#shadow)"/>
+      <rect x="235" y="240" width="210" height="26" rx="5" fill="#1a6e9e"/>
+      <text x="340" y="258" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">BOOKINGS (การจองคิว)</text>
+      <text x="245" y="282" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#991b1b">[PK] id : String (UUID)</text>
+      <text x="245" y="299" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#1e40af">[FK] userId &rarr; USERS</text>
+      <text x="245" y="316" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#1e40af">[FK] serviceId &rarr; SERVICES</text>
+      <text x="245" y="333" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#1e40af">[FK] staffId &rarr; STAFF</text>
+      <text x="245" y="350" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">bookingDate / timeSlot</text>
+      <text x="245" y="367" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">queueNumber (เช่น A001)</text>
+      <text x="245" y="384" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">status : String</text>
+      <text x="245" y="401" font-family="'Sarabun', sans-serif" font-size="10" fill="#777">createdAt / calledAt</text>
+
+      <!-- Entity: NOTIFICATIONS -->
+      <rect x="20" y="260" width="180" height="135" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.8" filter="url(#shadow)"/>
+      <rect x="20" y="260" width="180" height="26" rx="5" fill="#b45309"/>
+      <text x="110" y="278" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">NOTIFICATIONS</text>
+      <text x="30" y="305" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#991b1b">[PK] id : String</text>
+      <text x="30" y="325" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#1e40af">[FK] userId &rarr; USERS</text>
+      <text x="30" y="345" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#1e40af">[FK] bookingId &rarr; BOOKINGS</text>
+      <text x="30" y="365" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">message / confirmed</text>
+      <text x="30" y="382" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#777">confirmedAt / createdAt</text>
+
+      <!-- Entity: QUEUE_STATUS -->
+      <rect x="480" y="260" width="180" height="120" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1.8" filter="url(#shadow)"/>
+      <rect x="480" y="260" width="180" height="26" rx="5" fill="#475569"/>
+      <text x="570" y="278" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">QUEUE_STATUS</text>
+      <text x="490" y="305" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#991b1b">[PK] date : String (YYYY-MM-DD)</text>
+      <text x="490" y="325" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">currentQueue : String</text>
+      <text x="490" y="345" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">currentBookId : String</text>
+      <text x="490" y="365" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#777">updatedAt : Timestamp</text>
+
+      <!-- RELATIONSHIP LINES -->
+      <!-- USERS -> BOOKINGS (1 : N) -->
+      <path d="M 110 180 L 110 240 L 235 290" fill="none" stroke="#235c40" stroke-width="1.6"/>
+      <text x="120" y="200" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#235c40">1</text>
+      <text x="215" y="285" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#235c40">N</text>
+
+      <!-- SERVICES -> BOOKINGS (1 : N) -->
+      <path d="M 340 180 L 340 240" fill="none" stroke="#235c40" stroke-width="1.6"/>
+      <text x="345" y="200" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#235c40">1</text>
+      <text x="345" y="232" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#235c40">N</text>
+
+      <!-- STAFF -> BOOKINGS (1 : N) -->
+      <path d="M 570 180 L 570 240 L 445 290" fill="none" stroke="#235c40" stroke-width="1.6"/>
+      <text x="560" y="200" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#235c40">1</text>
+      <text x="460" y="285" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#235c40">N</text>
+
+      <!-- BOOKINGS -> NOTIFICATIONS (1 : N) -->
+      <path d="M 235 340 L 200 340" fill="none" stroke="#b45309" stroke-width="1.6"/>
+      <text x="220" y="335" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#b45309">1</text>
+      <text x="205" y="335" font-family="'Prompt', sans-serif" font-size="10" font-weight="600" fill="#b45309">N</text>
+    </svg>
+    <div class="diagram-caption">ภาพที่ 3.5 ผังแสดงความสัมพันธ์ของข้อมูล (Entity-Relationship Diagram: ER Diagram)</div>
+  </div>
+
+  <p class="no-indent" style="font-weight:600;">คำอธิบายหลักการทำงานและความสัมพันธ์ระหว่างเอนทิตี (Cardinality & Business Rules):</p>
+  <ul>
+    <li><strong>USERS กับ BOOKINGS (ความสัมพันธ์แบบ 1 ต่อ กลุ่ม - 1:N):</strong> ผู้ใช้บริการ 1 ท่าน (<code>USERS</code>) สามารถสร้างรายการจองคิวนวดแผนไทย (<code>BOOKINGS</code>) ได้หลายรายการในวันเวลาที่แตกต่างกัน โดยมี <code>userId</code> เป็น Foreign Key</li>
+    <li><strong>SERVICES กับ BOOKINGS (ความสัมพันธ์แบบ 1 ต่อ กลุ่ม - 1:N):</strong> บริการนวดแผนไทยแต่ละแพ็กเกจ (<code>SERVICES</code>) สามารถถูกเลือกในรายการจองได้หลายครั้ง โดยมีการ Snapshot ชื่อและราคาไว้ใน <code>BOOKINGS</code> เพื่อป้องกันปัญหาข้อมูลเปลี่ยนย้อนหลัง</li>
+    <li><strong>STAFF กับ BOOKINGS (ความสัมพันธ์แบบ 1 ต่อ กลุ่ม - 1:N):</strong> หมอนวดหรือแพทย์แผนไทย 1 ท่าน (<code>STAFF</code>) สามารถรับผิดชอบให้บริการการจองได้หลายคิวงาน (ในเวลาที่ไม่ซ้ำกัน) โดยมี <code>staffId</code> เป็น Foreign Key</li>
+    <li><strong>BOOKINGS กับ NOTIFICATIONS (ความสัมพันธ์แบบ 1 ต่อ กลุ่ม - 1:N):</strong> การจองคิว 1 รายการ สามารถทำให้เกิดการแจ้งเตือนหลายครั้ง (เช่น แจ้งยืนยันการจอง, แจ้งเตือนเมื่อถึงคิว) โดยแต่ละแจ้งเตือนมีฟิลด์ <code>confirmed</code> เพื่อตรวจสอบว่าลูกค้ารับทราบแล้วหรือไม่</li>
+  </ul>
+</div>
+
+<!-- หน้าที่ 10: Database Schema & UI Architecture -->
+<div class="page">
+  <h2 class="section-title">3.6 โครงสร้างฐานข้อมูล (Database Schema / Firestore Collections)</h2>
+  <p>
+    ระบบเลือกใช้ฐานข้อมูลแบบ NoSQL Document Database (Cloud Firestore) โดยมีการออกแบบโครงสร้างตารางข้อมูล (Collections) เพื่อรองรับการสืบค้นข้อมูลที่มีประสิทธิภาพสูง ดังนี้:
+  </p>
+
+  <div class="table-container">
+    <div class="table-caption">ตารางที่ 3.9 โครงสร้างตารางข้อมูลการจองคิว (Collection: bookings)</div>
+    <table class="academic-table">
+      <thead>
+        <tr><th style="width:25%;">ชื่อฟิลด์ (Field)</th><th style="width:20%;">ชนิดข้อมูล (Type)</th><th style="width:20%;">คีย์ (Key)</th><th style="width:35%;">คำอธิบาย (Description)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>String (UUID)</td><td><span class="badge badge-pk">PK</span></td><td>รหัสรายการจองคิว</td></tr>
+        <tr><td><code>userId</code></td><td>String</td><td><span class="badge badge-fk">FK</span></td><td>รหัสผู้ใช้บริการ (อ้างอิง <code>users.uid</code>)</td></tr>
+        <tr><td><code>serviceId</code></td><td>String</td><td><span class="badge badge-fk">FK</span></td><td>รหัสบริการนวด (อ้างอิง <code>services.id</code>)</td></tr>
+        <tr><td><code>staffId</code></td><td>String (Nullable)</td><td><span class="badge badge-fk">FK</span></td><td>รหัสหมอนวด (อ้างอิง <code>staff.id</code>)</td></tr>
+        <tr><td><code>serviceName</code></td><td>String</td><td>-</td><td>ชื่อบริการนวด (Snapshot)</td></tr>
+        <tr><td><code>servicePrice</code></td><td>Number</td><td>-</td><td>ราคาค่าบริการ (Snapshot)</td></tr>
+        <tr><td><code>bookingDate</code></td><td>String (YYYY-MM-DD)</td><td>-</td><td>วันที่นัดหมายรับบริการ</td></tr>
+        <tr><td><code>timeSlot</code></td><td>String (HH:mm)</td><td>-</td><td>ช่วงเวลานัดหมาย (เช่น 10:00)</td></tr>
+        <tr><td><code>queueNumber</code></td><td>String</td><td>-</td><td>หมายเลขคิวประจำวัน (เช่น A001)</td></tr>
+        <tr><td><code>status</code></td><td>String</td><td>-</td><td>สถานะ (<code>pending</code>, <code>confirmed</code>, <code>in_service</code>, <code>done</code>, <code>cancelled</code>)</td></tr>
+        <tr><td><code>createdAt</code></td><td>Timestamp</td><td>-</td><td>วันเวลาที่ทำการจองในระบบ</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section-title">3.7 การออกแบบส่วนติดต่อผู้ใช้งาน (User Interface Architecture)</h2>
+  <p>
+    ส่วนต่อประสานผู้ใช้ได้รับการออกแบบตามหลัก Ergonomics UI และ Visual Hierarchy โดยแบ่งออกเป็น 2 ส่วนหลัก:
+  </p>
+  <ul>
+    <li><strong>Flutter Client Application (สำหรับผู้ใช้บริการ):</strong> ใช้โทนสี Forest Green (<code>#1B3A2D</code>) และ Jade (<code>#2E7D52</code>) ร่วมกับตัวอักษร Noto Serif Thai และ Sarabun ประกอบด้วยหน้าจอหลัก ได้แก่ หน้าเข้าสู่ระบบ ThaiD/OTP, หน้ารายการบริการและขั้นตอนเลือกวันเวลา, หน้าบัตรคิวสด และศูนย์การแจ้งเตือน</li>
+    <li><strong>Web Admin Dashboard (สำหรับเจ้าหน้าที่):</strong> พัฒนาในรูปแบบ Single Page Application (SPA) มี Sidebar นำทาง, การ์ดแสดงสถิติ Real-time, ตารางจัดการคิวพร้อมปุ่ม Call Next และปุ่มฟังก์ชันพิเศษ "Sync to Google Sheets" และ "Email หมอนวด" บนแถบ Topbar</li>
+  </ul>
+
+  <h2 class="section-title">3.8 สรุปผลบทที่ 3</h2>
+  <p>
+    บทที่ 3 ได้นำเสนอรายละเอียดการวิเคราะห์และออกแบบระบบจองคิวนวดแผนไทย ศูนย์สุขภาพชุมชนท่าวังหิน ครบถ้วนตามมาตรฐานวิศวกรรมซอฟต์แวร์ ทั้ง Use Case Diagram, Use Case Descriptions, Sequence Diagrams แสดงกระบวนการทำงานหลักพร้อมคำอธิบาย, ER Diagram แสดงความสัมพันธ์ของข้อมูล และรายละเอียดโครงสร้างฐานข้อมูล เพื่อเป็นพิมพ์เขียว (Blueprint) ที่สมบูรณ์สำหรับการพัฒนาระบบจริงในบทที่ 4 ต่อไป
+  </p>
+</div>
+
+</body>
+</html>

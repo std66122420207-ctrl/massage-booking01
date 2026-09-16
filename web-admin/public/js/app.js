@@ -170,7 +170,11 @@ function renderStaffGrid() {
       <div style="font-size:12px;color:var(--slate);margin-top:6px">
         <i class="fa-solid fa-envelope"></i> ${s.email || '<span style="color:var(--status-cancel-text)">ยังไม่มีอีเมล</span>'}
       </div>
+      <select class="staff-status-select" style="margin-top:8px;width:100%" onchange="changeStaffStatus('${s.id}', this.value)">
+        ${Object.entries(statusLabel).map(([value, label]) => `<option value="${value}" ${s.status === value ? 'selected' : ''}>${label}</option>`).join('')}
+      </select>
       <button class="action-btn" style="margin-top:8px;width:100%" onclick='openStaffModal(${JSON.stringify(s).replace(/'/g, "&apos;")})'>แก้ไขข้อมูล</button>
+      <button class="action-btn btn-cancel" style="margin-top:8px;width:100%" onclick="removeStaff('${s.id}', '${s.name.replace(/'/g, "\\'")}')">ลบหมอนวด</button>
     </div>
   `).join('');
 }
@@ -193,6 +197,26 @@ function openStaffModal(staff) {
 
 function closeStaffModal() {
   staffModalOverlay.style.display = 'none';
+}
+
+async function changeStaffStatus(id, status) {
+  try {
+    await API.updateStaffStatus(id, status);
+    await loadStaff();
+    showToast('อัปเดตสถานะหมอนวดแล้ว ✓');
+  } catch (err) {
+    showToast(`เปลี่ยนสถานะไม่สำเร็จ: ${err.message}`);
+    await loadStaff();
+  }
+}
+
+async function removeStaff(id, name) {
+  if (!confirm(`ต้องการลบหมอนวด ${name} ออกจากรายชื่อใช้งานหรือไม่?`)) return;
+  try {
+    await API.deleteStaff(id);
+    await loadStaff();
+    showToast('ลบหมอนวดออกจากรายชื่อแล้ว');
+  } catch (err) { showToast(`ลบหมอนวดไม่สำเร็จ: ${err.message}`); }
 }
 
 staffModalForm.addEventListener('submit', async (e) => {
@@ -337,7 +361,8 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
 function renderQueuePage() {
   const list = bookings.filter(matchesBookingSearch);
   const current  = list.find(b => b.status === 'in_service');
-  const waiting  = list.filter(b => ['pending', 'confirmed'].includes(b.status));
+  const waiting  = list.filter(b => ['pending', 'confirmed'].includes(b.status))
+    .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
   const done     = list.filter(b => b.status === 'done');
 
   document.getElementById('queue-current').textContent      = current?.queueNumber || '-';
@@ -351,13 +376,14 @@ function renderQueuePage() {
       <td>${b.timeSlot}</td>
       <td>${b.customerName || b.userName || '-'}</td>
       <td>${b.serviceName}</td>
+      <td>${b.staffName || '-'}</td>
       <td><span class="badge ${STATUS_BADGE[b.status]}">${STATUS_LABEL[b.status]}</span></td>
       <td>
         <button class="action-btn btn-call" onclick="callSpecific('${b.id}')">เรียก</button>
         <button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
+  `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
 }
 
 function matchesBookingSearch(booking) {

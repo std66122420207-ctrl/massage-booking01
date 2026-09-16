@@ -39,6 +39,42 @@ class ServiceModel {
   }
 }
 
+class StaffModel {
+  final String id;
+  final String name;
+  final String status;
+  final String? photo;
+  final String experience;
+
+  const StaffModel({
+    required this.id,
+    required this.name,
+    required this.status,
+    this.photo,
+    this.experience = '',
+  });
+
+  factory StaffModel.fromMap(String id, Map<String, dynamic> m) {
+    return StaffModel(
+      id: id,
+      name: m['name'] ?? '',
+      status: m['status'] ?? 'available',
+      photo: m['photo'],
+      experience: m['experience'] ?? '',
+    );
+  }
+
+  String get statusLabel {
+    const labels = {
+      'available': 'ว่าง',
+      'busy': 'ไม่ว่าง',
+      'break': 'หยุด',
+      'off': 'ลา',
+    };
+    return labels[status] ?? status;
+  }
+}
+
 // ── models/booking_model.dart ──────────────────────────────
 class BookingModel {
   final String id;
@@ -47,6 +83,7 @@ class BookingModel {
   final String serviceName;
   final int servicePrice;
   final String? staffId;
+  final String? staffName;
   final String bookingDate; // yyyy-MM-dd
   final String timeSlot; // HH:mm
   final String queueNumber; // A001
@@ -60,6 +97,7 @@ class BookingModel {
     required this.serviceName,
     required this.servicePrice,
     this.staffId,
+    this.staffName,
     required this.bookingDate,
     required this.timeSlot,
     required this.queueNumber,
@@ -75,6 +113,7 @@ class BookingModel {
       serviceName: m['serviceName'] ?? '',
       servicePrice: m['servicePrice'] ?? 0,
       staffId: m['staffId'],
+      staffName: m['staffName'],
       bookingDate: m['bookingDate'] ?? '',
       timeSlot: m['timeSlot'] ?? '',
       queueNumber: m['queueNumber'] ?? '',

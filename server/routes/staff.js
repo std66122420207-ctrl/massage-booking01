@@ -17,10 +17,27 @@ router.get('/', async (req, res) => {
 // PATCH /api/staff/:id/status — Admin: อัปเดตสถานะหมอนวด
 router.patch('/:id/status', verifyToken, requireAdmin, async (req, res) => {
   const { status } = req.body; // available | busy | break | off
+  if (!['available', 'busy', 'break', 'off'].includes(status)) {
+    return res.status(400).json({ error: 'สถานะหมอนวดไม่ถูกต้อง' });
+  }
   try {
     await db.collection(COLLECTIONS.STAFF).doc(req.params.id).update({
       status,
       statusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/staff/:id — Admin: ปิดการใช้งานหมอนวด (เก็บประวัติเดิมไว้)
+router.delete('/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    await db.collection(COLLECTIONS.STAFF).doc(req.params.id).update({
+      active: false,
+      status: 'off',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
     res.json({ success: true });
   } catch (err) {

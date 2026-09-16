@@ -32,9 +32,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       final bookingService = context.read<BookingService>();
       bookingService.loadServices();
+      bookingService.loadStaff();
       bookingService.loadMyBookings();
       bookingService.loadNotifications();
-      
+
       // เริ่มระบบ push notification (ขอ permission + ส่ง FCM token ไป backend)
       NotificationService.init(onMessageReceived: () {
         if (mounted) {

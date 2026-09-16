@@ -4,6 +4,7 @@ import 'api_client.dart';
 
 class BookingService extends ChangeNotifier {
   List<ServiceModel> _services = [];
+  List<StaffModel> _staff = [];
   List<BookingModel> _bookings = [];
   List<NotificationModel> _notifications = [];
   bool _loading = false;
@@ -11,6 +12,9 @@ class BookingService extends ChangeNotifier {
   String? _error;
 
   List<ServiceModel> get services => _services;
+  List<StaffModel> get staff => _staff;
+  List<StaffModel> get availableStaff =>
+      _staff.where((person) => person.status == 'available').toList();
   List<BookingModel> get bookings => _bookings;
   List<NotificationModel> get notifications => _notifications;
   int get unconfirmedCount => _notifications.where((n) => !n.confirmed).length;
@@ -32,6 +36,19 @@ class BookingService extends ChangeNotifier {
     } catch (e) {
       _error = 'โหลดรายการบริการไม่สำเร็จ: $e';
       _services = [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadStaff() async {
+    try {
+      final data = await ApiClient.get('/staff');
+      _staff = (data as List)
+          .map((e) => StaffModel.fromMap(e['id'], Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      _error = 'โหลดรายชื่อหมอนวดไม่สำเร็จ: $e';
+      _staff = [];
     }
     notifyListeners();
   }
@@ -103,6 +120,7 @@ class BookingService extends ChangeNotifier {
           serviceName: old.serviceName,
           servicePrice: old.servicePrice,
           staffId: old.staffId,
+          staffName: old.staffName,
           bookingDate: old.bookingDate,
           timeSlot: old.timeSlot,
           queueNumber: old.queueNumber,

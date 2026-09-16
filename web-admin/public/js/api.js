@@ -44,6 +44,21 @@ const API = {
     });
   },
 
+  async updateStaffStatus(id, status) {
+    return this._request(`/staff/${id}/status`, {
+      method: 'PATCH',
+      headers: await this._headers(),
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async deleteStaff(id) {
+    return this._request(`/staff/${id}`, {
+      method: 'DELETE',
+      headers: await this._headers(),
+    });
+  },
+
   async createStaff(data) {
     return this._request('/staff', {
       method: 'POST',

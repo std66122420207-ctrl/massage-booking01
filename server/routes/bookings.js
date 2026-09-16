@@ -24,7 +24,7 @@ router.get('/', verifyToken, async (req, res) => {
 router.post('/', verifyToken, async (req, res) => {
   const { serviceId, staffId, bookingDate, timeSlot, customerName, customerPhone } = req.body;
 
-  if (!serviceId || !bookingDate || !timeSlot) {
+  if (!serviceId || !staffId || !bookingDate || !timeSlot) {
     return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบ' });
   }
 
@@ -45,6 +45,21 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบบริการที่เลือก' });
     }
     const service = serviceDoc.data();
+    const staffDoc = await db.collection(COLLECTIONS.STAFF).doc(staffId).get();
+    if (!staffDoc.exists || staffDoc.data().active !== true) {
+      return res.status(404).json({ error: 'ไม่พบหมอนวดที่เลือก' });
+    }
+    if ((staffDoc.data().status || 'available') !== 'available') {
+      return res.status(409).json({ error: 'หมอนวดคนนี้ไม่ว่าง กรุณาเลือกคนอื่น' });
+    }
+
+    const [hours, minutes] = String(timeSlot).split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const duration = Number(service.duration) || 60;
+    if (!Number.isFinite(startMinutes) || startMinutes < 0 || startMinutes >= 1440) {
+      return res.status(400).json({ error: 'รูปแบบเวลาไม่ถูกต้อง' });
+    }
+    const endMinutes = startMinutes + duration;
 
     const bookingId = uuidv4();
 
@@ -53,14 +68,20 @@ router.post('/', verifyToken, async (req, res) => {
     // (เดิม: เช็คซ้ำอยู่นอก try/catch ทำให้ error จาก Firestore
     //  ไม่ถูกจับ และอาจทำให้ server ค้าง/ล่มได้)
     const booking = await db.runTransaction(async (t) => {
-      const dupSnap = await t.get(
+      const staffBookings = await t.get(
         db.collection(COLLECTIONS.BOOKINGS)
           .where('bookingDate', '==', bookingDate)
-          .where('timeSlot', '==', timeSlot)
-          .where('staffId', '==', staffId || '')
-          .where('status', 'in', ['pending', 'confirmed'])
+          .where('staffId', '==', staffId)
       );
-      if (!dupSnap.empty) {
+      const overlaps = staffBookings.docs.some((doc) => {
+        const existing = doc.data();
+        if (!['pending', 'confirmed', 'in_service'].includes(existing.status)) return false;
+        const [existingHours, existingMinutes] = String(existing.timeSlot || '').split(':').map(Number);
+        const existingStart = existingHours * 60 + existingMinutes;
+        const existingEnd = existingStart + (Number(existing.duration) || 60);
+        return startMinutes < existingEnd && endMinutes > existingStart;
+      });
+      if (overlaps) {
         throw Object.assign(new Error('เวลานี้ถูกจองแล้ว กรุณาเลือกเวลาอื่น'), { code: 409 });
       }
 
@@ -78,7 +99,9 @@ router.post('/', verifyToken, async (req, res) => {
         serviceId,
         serviceName:  service.name || '',
         servicePrice: service.price || 0,
+        duration,
         staffId:      staffId || null,
+        staffName:    staffDoc.data().name || '',
         bookingDate,
         timeSlot,
         queueNumber,
@@ -123,9 +146,47 @@ router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
   }
 
   try {
+    const bookingRef = db.collection(COLLECTIONS.BOOKINGS).doc(req.params.id);
+    const bookingDoc = await bookingRef.get();
+    if (!bookingDoc.exists) return res.status(404).json({ error: 'ไม่พบการจอง' });
+    const currentBooking = bookingDoc.data();
+
+    if (staffId && staffId !== currentBooking.staffId) {
+      const staffDoc = await db.collection(COLLECTIONS.STAFF).doc(staffId).get();
+      if (!staffDoc.exists || staffDoc.data().active !== true) {
+        return res.status(404).json({ error: 'ไม่พบหมอนวดที่เลือก' });
+      }
+      if ((staffDoc.data().status || 'available') !== 'available') {
+        return res.status(409).json({ error: 'หมอนวดคนนี้ไม่ว่าง กรุณาเลือกคนอื่น' });
+      }
+      const staffBookings = await db.collection(COLLECTIONS.BOOKINGS)
+        .where('bookingDate', '==', currentBooking.bookingDate)
+        .where('staffId', '==', staffId)
+        .get();
+      const [hours, minutes] = String(currentBooking.timeSlot || '').split(':').map(Number);
+      const startMinutes = hours * 60 + minutes;
+      const endMinutes = startMinutes + (Number(currentBooking.duration) || 60);
+      const overlaps = staffBookings.docs.some((doc) => {
+        if (doc.id === req.params.id) return false;
+        const existing = doc.data();
+        if (!['pending', 'confirmed', 'in_service'].includes(existing.status)) return false;
+        const [existingHours, existingMinutes] = String(existing.timeSlot || '').split(':').map(Number);
+        const existingStart = existingHours * 60 + existingMinutes;
+        const existingEnd = existingStart + (Number(existing.duration) || 60);
+        return startMinutes < existingEnd && endMinutes > existingStart;
+      });
+      if (overlaps) {
+        return res.status(409).json({ error: 'หมอนวดคนนี้มีคิวชนกันในช่วงเวลานี้' });
+      }
+    }
+
     const updates = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
     if (status)  updates.status  = status;
-    if (staffId) updates.staffId = staffId;
+    if (staffId) {
+      updates.staffId = staffId;
+      const staffDoc = await db.collection(COLLECTIONS.STAFF).doc(staffId).get();
+      updates.staffName = staffDoc.data().name || '';
+    }
     if (room)    updates.room    = room;
 
     await db.collection(COLLECTIONS.BOOKINGS).doc(req.params.id).update(updates);
@@ -143,8 +204,26 @@ router.get('/admin/today', verifyToken, requireAdmin, async (req, res) => {
       .where('bookingDate', '==', today)
       .get();
 
+    const staffSnap = await db.collection(COLLECTIONS.STAFF).get();
+    const staffById = Object.fromEntries(staffSnap.docs.map((d) => [d.id, d.data()]));
+    const userIds = [...new Set(snap.docs.map((d) => d.data().userId).filter(Boolean))];
+    const userEntries = await Promise.all(userIds.map(async (uid) => {
+      const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
+      return [uid, userDoc.exists ? userDoc.data() : {}];
+    }));
+    const userById = Object.fromEntries(userEntries);
     const bookings = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
+      .map(d => {
+        const booking = { id: d.id, ...d.data() };
+        const user = userById[booking.userId] || {};
+        const staff = staffById[booking.staffId] || {};
+        return {
+          ...booking,
+          customerName: booking.customerName || user.name || '',
+          customerPhone: booking.customerPhone || user.phone || '',
+          staffName: staff.name || '',
+        };
+      })
       .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
     res.json(bookings);
   } catch (err) {

@@ -244,6 +244,7 @@ class BookingSheet extends StatefulWidget {
 class _BookingSheetState extends State<BookingSheet> {
   DateTime _selected = DateTime.now();
   String? _timeSlot;
+  String? _staffId;
   bool _submitting = false;
 
   final _times = [
@@ -261,6 +262,11 @@ class _BookingSheetState extends State<BookingSheet> {
     '15:30'
   ];
   Future<void> _confirm() async {
+    if (_staffId == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('กรุณาเลือกหมอนวด')));
+      return;
+    }
     if (_timeSlot == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('กรุณาเลือกเวลา')));
@@ -271,6 +277,7 @@ class _BookingSheetState extends State<BookingSheet> {
           serviceId: widget.service.id,
           bookingDate: DateFormat('yyyy-MM-dd').format(_selected),
           timeSlot: _timeSlot!,
+          staffId: _staffId,
         );
     if (!mounted) return;
     setState(() => _submitting = false);
@@ -282,8 +289,9 @@ class _BookingSheetState extends State<BookingSheet> {
         builder: (_) => _SuccessDialog(booking: booking),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('เกิดข้อผิดพลาด กรุณาลองใหม่')));
+      final message = context.read<BookingService>().error ?? 'จองไม่สำเร็จ';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -342,6 +350,46 @@ class _BookingSheetState extends State<BookingSheet> {
             ),
             headerStyle: const HeaderStyle(
                 formatButtonVisible: false, titleCentered: true),
+          ),
+          const SizedBox(height: 16),
+
+          const Text('เลือกหมอนวด',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF777777))),
+          const SizedBox(height: 8),
+          Consumer<BookingService>(
+            builder: (_, booking, __) {
+              if (booking.staff.isEmpty) {
+                return const Text('ยังไม่มีหมอนวดที่ลงทะเบียน',
+                    style: TextStyle(color: Colors.redAccent));
+              }
+              return DropdownButtonFormField<String>(
+                initialValue: _staffId,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                hint: const Text('เลือกหมอนวดที่ว่าง'),
+                items: booking.staff.map((person) {
+                  final selectable = person.status == 'available';
+                  return DropdownMenuItem<String>(
+                    value: person.id,
+                    enabled: selectable,
+                    child: Row(children: [
+                      Icon(
+                        selectable ? Icons.circle : Icons.remove_circle,
+                        size: 11,
+                        color: selectable ? Colors.green : Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      Text('${person.name} (${person.statusLabel})'),
+                    ]),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => _staffId = value),
+              );
+            },
           ),
           const SizedBox(height: 16),
 
@@ -439,6 +487,8 @@ class _SuccessDialog extends StatelessWidget {
           _row('บริการ', booking.serviceName),
           _row('วันที่', booking.bookingDate),
           _row('เวลา', booking.timeSlot),
+          if (booking.staffName != null && booking.staffName!.isNotEmpty)
+            _row('หมอนวด', booking.staffName!),
           _row('หมายเลขคิว', booking.queueNumber),
           const SizedBox(height: 20),
           SizedBox(
