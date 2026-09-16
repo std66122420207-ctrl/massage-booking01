@@ -155,7 +155,7 @@ async function loadStaff() {
 
 function renderStaffGrid() {
   const grid = document.getElementById('staff-grid');
-  const statusLabel = { available: 'ให้บริการอยู่', busy: 'กำลังนวด', break: 'พักกลางวัน', off: 'ไม่อยู่' };
+  const statusLabel = { available: 'ว่าง', busy: 'ไม่ว่าง', break: 'หยุด', off: 'ลา' };
   const statusBadge = { available: 'badge-green', busy: 'badge-blue', break: 'badge-yellow', off: 'badge-gray' };
 
   grid.innerHTML = staffList.map(s => `
@@ -170,11 +170,13 @@ function renderStaffGrid() {
       <div style="font-size:12px;color:var(--slate);margin-top:6px">
         <i class="fa-solid fa-envelope"></i> ${s.email || '<span style="color:var(--status-cancel-text)">ยังไม่มีอีเมล</span>'}
       </div>
-      <select class="staff-status-select" style="margin-top:8px;width:100%" onchange="changeStaffStatus('${s.id}', this.value)">
+      <select class="staff-status-select" onchange="changeStaffStatus('${s.id}', this.value)">
         ${Object.entries(statusLabel).map(([value, label]) => `<option value="${value}" ${s.status === value ? 'selected' : ''}>${label}</option>`).join('')}
       </select>
-      <button class="action-btn" style="margin-top:8px;width:100%" onclick='openStaffModal(${JSON.stringify(s).replace(/'/g, "&apos;")})'>แก้ไขข้อมูล</button>
-      <button class="action-btn btn-cancel" style="margin-top:8px;width:100%" onclick="removeStaff('${s.id}', '${s.name.replace(/'/g, "\\'")}')">ลบหมอนวด</button>
+      <div class="staff-actions">
+        <button class="action-btn btn-edit" onclick='openStaffModal(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="fa-solid fa-pen"></i> แก้ไข</button>
+        <button class="action-btn btn-cancel" onclick='removeStaff(${JSON.stringify(s.id)}, ${JSON.stringify(s.name)})'><i class="fa-solid fa-trash"></i> ลบ</button>
+      </div>
     </div>
   `).join('');
 }

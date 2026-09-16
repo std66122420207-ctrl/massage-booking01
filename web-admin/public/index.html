@@ -228,10 +228,10 @@ tbody tr:hover td { background: var(--jade-pale); }
 .btn-secondary:hover { border-color: var(--slate); color: var(--forest); }
 
 /* ── STAFF ── */
-.staff-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.staff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
 .staff-card {
   background: var(--white); border-radius: var(--radius); border: 1px solid var(--border);
-  padding: 28px 20px 22px; text-align: center; box-shadow: var(--shadow-sm);
+  padding: 22px 20px 18px; text-align: left; box-shadow: var(--shadow-sm);
   transition: box-shadow 0.2s, transform 0.15s;
 }
 .staff-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
@@ -243,10 +243,21 @@ tbody tr:hover td { background: var(--jade-pale); }
 }
 .staff-name { font-family: 'Noto Serif Thai', serif; font-size: 16px; color: var(--forest); font-weight: 600; margin-bottom: 3px; }
 .staff-exp { font-size: 12px; color: var(--slate); margin-bottom: 12px; }
-.staff-count { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; color: var(--slate); }
+.staff-card .staff-name, .staff-card .staff-exp, .staff-card > .badge { display: block; text-align: center; }
+.staff-count { margin-top: 14px; padding: 12px 0; border-top: 1px solid var(--border); font-size: 13px; color: var(--slate); }
 .staff-count strong { color: var(--jade); font-weight: 700; }
 .staff-photo-img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin: 0 auto 14px; display: block; box-shadow: 0 4px 12px rgba(46,125,82,0.25); }
-.staff-add-btn { margin-bottom: 16px; }
+.staff-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.staff-toolbar h3 { font-family: 'Noto Serif Thai', serif; font-size: 18px; color: var(--forest); }
+.staff-toolbar p { margin-top: 3px; color: var(--slate); font-size: 12px; }
+.staff-add-btn { margin-bottom: 0; white-space: nowrap; }
+.staff-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.staff-actions .action-btn { width: 100%; justify-content: center; margin: 0; }
+.staff-status-select { margin-top: 8px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--mist); color: var(--forest); font: inherit; }
+@media (max-width: 560px) {
+  .staff-toolbar { align-items: flex-start; flex-direction: column; }
+  .staff-add-btn { width: 100%; }
+}
 
 /* ── MODAL ── */
 .modal-overlay {
@@ -520,7 +531,13 @@ tbody tr:hover td { background: var(--jade-pale); }
 
     <!-- STAFF -->
     <section id="page-staff" class="page">
-      <button class="btn-primary staff-add-btn" onclick="openStaffModal()">+ เพิ่มหมอนวดใหม่</button>
+      <div class="staff-toolbar">
+        <div>
+          <h3>ทีมหมอนวด</h3>
+          <p>จัดการรายชื่อ สถานะ รูปภาพ และคิวของหมอนวด</p>
+        </div>
+        <button class="btn-primary staff-add-btn" onclick="openStaffModal()"><i class="fa-solid fa-user-plus"></i> เพิ่มหมอนวดใหม่</button>
+      </div>
       <div class="staff-grid" id="staff-grid"></div>
     </section>
 
