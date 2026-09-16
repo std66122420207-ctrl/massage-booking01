@@ -430,15 +430,13 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
 // ── Queue Page ──────────────────────────────────────────────
 function renderQueuePage() {
   const list = bookings.filter(matchesBookingSearch);
-  const current  = list.find(b => b.status === 'in_service');
-    const current  = list.find(b => b.queueNumber === queueStatus.currentQueue)
-      || list.find(b => b.status === 'in_service');
+  const current  = list.find(b => b.queueNumber === queueStatus.currentQueue)
+    || list.find(b => b.status === 'in_service');
   const waiting  = list.filter(b => ['pending', 'confirmed'].includes(b.status))
     .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
   const done     = list.filter(b => b.status === 'done');
 
-  document.getElementById('queue-current').textContent      = current?.queueNumber || '-';
-    document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
+  document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
   document.getElementById('queue-waiting-count').textContent = `${waiting.length} คิว`;
   document.getElementById('queue-done-count').textContent    = `${done.length} คิว`;
   document.getElementById('queue-list-count').textContent    = `${waiting.length} คิว`;
