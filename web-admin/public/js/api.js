@@ -72,6 +72,9 @@ const API = {
       headers: await this._headers(),
     });
   },
+  async getQueueStatus() {
+    return this._request('/queue/status');
+  },
 
   async createBooking(data) {
     return this._request('/bookings', {
@@ -94,10 +97,6 @@ const API = {
       method: 'DELETE',
       headers: await this._headers(),
     });
-  },
-
-  async getQueueStatus() {
-    return this._request('/queue/status');
   },
 
   async callNextQueue() {

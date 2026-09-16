@@ -7,6 +7,7 @@ let services = [];
 let staffList = [];
 let bookings = [];
 let bookingSearch = '';
+let queueStatus = { currentQueue: null };
 
 const STATUS_LABEL = {
   pending:    'รอยืนยัน',
@@ -303,9 +304,15 @@ staffModalForm.addEventListener('submit', async (e) => {
 
 async function loadBookings() {
   try {
-    bookings = await API.getTodayBookings();
+    const [todayBookings, currentQueue] = await Promise.all([
+      API.getTodayBookings(),
+      API.getQueueStatus(),
+    ]);
+    bookings = todayBookings;
+    queueStatus = currentQueue || { currentQueue: null };
   } catch (err) {
     bookings = [];
+    queueStatus = { currentQueue: null };
     noteOfflineFallback();
     showToast(`โหลดการจองไม่สำเร็จ: ${err.message}`);
   }
@@ -322,13 +329,17 @@ function renderDashboardStats() {
   const done    = bookings.filter(b => b.status === 'done').length;
   const revenue = bookings.filter(b => b.status === 'done')
                           .reduce((sum, b) => sum + (b.servicePrice || 0), 0);
-  const current = bookings.find(b => b.status === 'in_service');
+  const current = bookings.find(b => b.queueNumber === queueStatus.currentQueue)
+    || bookings.find(b => b.status === 'in_service');
 
   document.getElementById('stat-total').textContent   = total;
   document.getElementById('stat-waiting').textContent = waiting;
   document.getElementById('stat-done').textContent    = done;
   document.getElementById('stat-revenue').textContent = revenue.toLocaleString();
   document.getElementById('stat-current').textContent = current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
+    document.getElementById('stat-current').textContent = queueStatus.currentQueue
+      ? `กำลังให้บริการ: ${queueStatus.currentQueue}`
+      : current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
   document.getElementById('stat-staff-count').textContent = staffList.length;
 
   buildTrendChart();
@@ -359,6 +370,7 @@ function renderBookingsTable() {
       <td class="queue-id">${b.queueNumber}</td>
       <td>${b.timeSlot}</td>
       <td>${b.customerName || b.userName || '-'}</td>
+      <td>${b.customerPhone || '-'}</td>
       <td>${b.serviceName}</td>
       <td>${b.staffName || '-'}</td>
       <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
@@ -369,7 +381,7 @@ function renderBookingsTable() {
         ` : ''}
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
+  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
 }
 
 async function markDone(id) {
@@ -419,11 +431,14 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
 function renderQueuePage() {
   const list = bookings.filter(matchesBookingSearch);
   const current  = list.find(b => b.status === 'in_service');
+    const current  = list.find(b => b.queueNumber === queueStatus.currentQueue)
+      || list.find(b => b.status === 'in_service');
   const waiting  = list.filter(b => ['pending', 'confirmed'].includes(b.status))
     .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
   const done     = list.filter(b => b.status === 'done');
 
   document.getElementById('queue-current').textContent      = current?.queueNumber || '-';
+    document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
   document.getElementById('queue-waiting-count').textContent = `${waiting.length} คิว`;
   document.getElementById('queue-done-count').textContent    = `${done.length} คิว`;
   document.getElementById('queue-list-count').textContent    = `${waiting.length} คิว`;
@@ -433,6 +448,7 @@ function renderQueuePage() {
       <td class="queue-id">${b.queueNumber}</td>
       <td>${b.timeSlot}</td>
       <td>${b.customerName || b.userName || '-'}</td>
+      <td>${b.customerPhone || '-'}</td>
       <td>${b.serviceName}</td>
       <td>${b.staffName || '-'}</td>
       <td><span class="badge ${STATUS_BADGE[b.status]}">${STATUS_LABEL[b.status]}</span></td>
@@ -441,7 +457,7 @@ function renderQueuePage() {
         <button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
+  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
 }
 
 function matchesBookingSearch(booking) {

@@ -33,6 +33,11 @@ router.post('/', verifyToken, async (req, res) => {
   const bookDate = new Date(bookingDate);
   const diffDays = Math.floor((bookDate - today) / 86400000);
   try {
+    const userDoc = await db.collection(COLLECTIONS.USERS).doc(req.user.uid).get();
+    const userProfile = userDoc.exists ? userDoc.data() : {};
+    const resolvedCustomerName = customerName || userProfile.name || req.user.name || '';
+    const resolvedCustomerPhone = customerPhone || userProfile.phone || req.user.phone_number || '';
+
     const settingsDoc = await db.collection('settings').doc('general').get();
     const maxAdvanceDays = Number(settingsDoc.data()?.advance) || 3;
     if (diffDays < 0 || diffDays > maxAdvanceDays) {
@@ -94,8 +99,8 @@ router.post('/', verifyToken, async (req, res) => {
       const newBooking = {
         id:           bookingId,
         userId:       req.user.uid,
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
+        customerName: resolvedCustomerName || null,
+        customerPhone: resolvedCustomerPhone || null,
         serviceId,
         serviceName:  service.name || '',
         servicePrice: service.price || 0,
