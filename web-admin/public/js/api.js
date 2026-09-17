@@ -150,6 +150,20 @@ const API = {
     });
   },
 
+  async confirmNotificationByAdmin(id) {
+    return this._request(`/notifications/${id}/admin-confirm`, {
+      method: 'POST',
+      headers: await this._headers(),
+    });
+  },
+
+  async cancelNotificationBooking(id) {
+    return this._request(`/notifications/${id}/admin-cancel`, {
+      method: 'POST',
+      headers: await this._headers(),
+    });
+  },
+
   async getReport() {
     return this._request('/admin/report', { headers: await this._headers() });
   },

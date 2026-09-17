@@ -281,6 +281,21 @@ class _BookingSheetState extends State<BookingSheet> {
           .showSnackBar(const SnackBar(content: Text('กรุณาเลือกเวลา')));
       return;
     }
+    final now = DateTime.now();
+    final selectedStart = DateTime(
+      _selected.year,
+      _selected.month,
+      _selected.day,
+      int.parse(_timeSlot!.split(':')[0]),
+      int.parse(_timeSlot!.split(':')[1]),
+    );
+    if (selectedStart.isBefore(now) || selectedStart.isAtSameMomentAs(now)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('เวลานัดนี้ผ่านไปแล้ว กรุณาเลือกเวลาใหม่')),
+      );
+      return;
+    }
     final nationalId =
         _nationalIdController.text.replaceAll(RegExp(r'[\s-]'), '');
     if (_healthcareRight != 'direct' &&
@@ -463,13 +478,26 @@ class _BookingSheetState extends State<BookingSheet> {
             runSpacing: 8,
             children: _times.map((t) {
               final sel = _timeSlot == t;
+              final slotParts = t.split(':');
+              final slotDate = DateTime(
+                _selected.year,
+                _selected.month,
+                _selected.day,
+                int.parse(slotParts[0]),
+                int.parse(slotParts[1]),
+              );
+              final past = slotDate.isBefore(DateTime.now());
               return GestureDetector(
-                onTap: () => setState(() => _timeSlot = t),
+                onTap: past ? null : () => setState(() => _timeSlot = t),
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: sel ? sage : const Color(0xFFEEF4EE),
+                    color: past
+                        ? Colors.grey.shade200
+                        : sel
+                            ? sage
+                            : const Color(0xFFEEF4EE),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(t,
@@ -477,7 +505,11 @@ class _BookingSheetState extends State<BookingSheet> {
                         fontFamily: 'Sarabun',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: sel ? Colors.white : navy,
+                        color: past
+                            ? Colors.grey
+                            : sel
+                                ? Colors.white
+                                : navy,
                       )),
                 ),
               );

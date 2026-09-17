@@ -527,12 +527,14 @@ function renderNotifications(list) {
   document.getElementById('notif-tbody').innerHTML = list.slice(0, 20).map(n => `
     <tr>
       <td>${n.message || '-'}</td>
-      <td>${n.customerName || '-'}</td>
+      <td>${n.customerName || '-'}${n.queueNumber ? `<br><small class="queue-id">${n.queueNumber}</small>` : ''}</td>
       <td>${n.customerPhone || '-'}</td>
       <td>${n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH') : '-'}</td>
       <td><span class="badge ${n.confirmed ? 'badge-green' : 'badge-yellow'}">${n.confirmed ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}</span></td>
       <td>
         ${n.customerPhone ? `<a class="action-btn btn-call" href="tel:${n.customerPhone}"><i class="fa-solid fa-phone"></i> โทร</a>` : ''}
+        ${!n.confirmed ? `<button class="action-btn btn-done" onclick="confirmNotificationByAdmin('${n.id}')"><i class="fa-solid fa-check"></i> ยืนยันคิว</button>` : ''}
+        ${!n.confirmed ? `<button class="action-btn btn-cancel" onclick="cancelNotificationBooking('${n.id}')"><i class="fa-solid fa-xmark"></i> ยกเลิกคิว</button>` : ''}
         ${!n.confirmed ? `<button class="action-btn btn-edit" onclick="resendNotification('${n.id}')"><i class="fa-solid fa-paper-plane"></i> ส่งซ้ำ</button>` : ''}
       </td>
     </tr>
@@ -546,6 +548,27 @@ async function resendNotification(id) {
     await loadNotifications();
   } catch (err) {
     showToast(`ส่งแจ้งเตือนซ้ำไม่สำเร็จ: ${err.message}`);
+  }
+}
+
+async function confirmNotificationByAdmin(id) {
+  try {
+    await API.confirmNotificationByAdmin(id);
+    showToast('แอดมินยืนยันคิวแล้ว ✓');
+    await Promise.all([loadNotifications(), loadBookings()]);
+  } catch (err) {
+    showToast(`ยืนยันคิวไม่สำเร็จ: ${err.message}`);
+  }
+}
+
+async function cancelNotificationBooking(id) {
+  if (!confirm('ยืนยันการยกเลิกคิวนี้หรือไม่?')) return;
+  try {
+    await API.cancelNotificationBooking(id);
+    showToast('ยกเลิกคิวแล้ว');
+    await Promise.all([loadNotifications(), loadBookings()]);
+  } catch (err) {
+    showToast(`ยกเลิกคิวไม่สำเร็จ: ${err.message}`);
   }
 }
 

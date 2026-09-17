@@ -63,6 +63,57 @@ router.post('/:id/resend', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// ── POST /api/notifications/:id/admin-confirm — Admin: ยืนยันคิวแทนลูกค้า
+router.post('/:id/admin-confirm', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const notificationRef = db.collection(COLLECTIONS.NOTIFICATIONS).doc(req.params.id);
+    const notificationDoc = await notificationRef.get();
+    if (!notificationDoc.exists) return res.status(404).json({ error: 'ไม่พบการแจ้งเตือนนี้' });
+    const notification = notificationDoc.data();
+    await notificationRef.update({
+      confirmed: true,
+      confirmedByAdmin: true,
+      confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    if (notification.bookingId) {
+      await db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId).update({
+        status: 'confirmed',
+        confirmedByAdmin: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    res.json({ success: true, message: 'ยืนยันคิวแล้ว' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/notifications/:id/admin-cancel — Admin: ยกเลิกคิวแทนลูกค้า
+router.post('/:id/admin-cancel', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const notificationRef = db.collection(COLLECTIONS.NOTIFICATIONS).doc(req.params.id);
+    const notificationDoc = await notificationRef.get();
+    if (!notificationDoc.exists) return res.status(404).json({ error: 'ไม่พบการแจ้งเตือนนี้' });
+    const notification = notificationDoc.data();
+    await notificationRef.update({
+      confirmed: true,
+      resolvedByAdmin: true,
+      resolvedAction: 'cancelled',
+      resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    if (notification.bookingId) {
+      await db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId).update({
+        status: 'cancelled',
+        cancelledByAdmin: true,
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    res.json({ success: true, message: 'ยกเลิกคิวแล้ว' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/notifications/admin/all — แอดมิน: ดูว่าใครยังไม่กดยืนยัน ──
 // ใช้เบอร์โทรลูกค้าโทรติดต่อเองกรณีแอปแจ้งเตือนไม่ถึง (ตามที่ระบุในสเปค)
 router.get('/admin/all', verifyToken, requireAdmin, async (req, res) => {
@@ -74,16 +125,36 @@ router.get('/admin/all', verifyToken, requireAdmin, async (req, res) => {
     const notifications = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     const userIds = [...new Set(notifications.map((n) => n.userId).filter(Boolean))];
+    const bookingIds = [...new Set(notifications.map((n) => n.bookingId).filter(Boolean))];
     const userById = {};
+    const bookingById = {};
     await Promise.all(userIds.map(async (uid) => {
       const doc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
-      if (doc.exists) userById[uid] = doc.data();
+      if (doc.exists) {
+        userById[uid] = doc.data();
+        return;
+      }
+      try {
+        const authUser = await admin.auth().getUser(uid);
+        userById[uid] = {
+          name: authUser.displayName || '',
+          phone: authUser.phoneNumber || '',
+        };
+      } catch {
+        userById[uid] = {};
+      }
+    }));
+    await Promise.all(bookingIds.map(async (bookingId) => {
+      const doc = await db.collection(COLLECTIONS.BOOKINGS).doc(bookingId).get();
+      if (doc.exists) bookingById[bookingId] = doc.data();
     }));
 
     res.json(notifications.map((n) => ({
       ...n,
-      customerName:  userById[n.userId]?.name || '',
-      customerPhone: userById[n.userId]?.phone || '',
+      customerName:  bookingById[n.bookingId]?.customerName || userById[n.userId]?.name || '',
+      customerPhone: bookingById[n.bookingId]?.customerPhone || userById[n.userId]?.phone || '',
+      queueNumber:   bookingById[n.bookingId]?.queueNumber || '',
+      bookingStatus: bookingById[n.bookingId]?.status || '',
     })));
   } catch (err) {
     res.status(500).json({ error: err.message });

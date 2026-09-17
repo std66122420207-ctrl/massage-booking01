@@ -4,6 +4,19 @@ const { v4: uuidv4 } = require('uuid');
 const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
+function getBangkokNow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    minutes: Number(values.hour) * 60 + Number(values.minute),
+  };
+}
+
 // ── GET /api/bookings — รายการจองของผู้ใช้ ─────────────────
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -83,6 +96,10 @@ router.post('/', verifyToken, async (req, res) => {
     if (!Number.isFinite(startMinutes) || startMinutes < 0 || startMinutes >= 1440) {
       return res.status(400).json({ error: 'รูปแบบเวลาไม่ถูกต้อง' });
     }
+    const bangkokNow = getBangkokNow();
+    if (bookingDate === bangkokNow.date && startMinutes <= bangkokNow.minutes) {
+      return res.status(400).json({ error: 'เวลานัดนี้ผ่านไปแล้ว กรุณาเลือกเวลาใหม่' });
+    }
     const endMinutes = startMinutes + duration;
 
     const bookingId = uuidv4();
@@ -99,7 +116,7 @@ router.post('/', verifyToken, async (req, res) => {
       );
       const overlaps = staffBookings.docs.some((doc) => {
         const existing = doc.data();
-        if (!['pending', 'confirmed', 'in_service'].includes(existing.status)) return false;
+        if (!['pending', 'confirmed', 'auto_called', 'in_service'].includes(existing.status)) return false;
         const [existingHours, existingMinutes] = String(existing.timeSlot || '').split(':').map(Number);
         const existingStart = existingHours * 60 + existingMinutes;
         const existingEnd = existingStart + (Number(existing.duration) || 60);
