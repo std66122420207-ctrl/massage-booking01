@@ -79,6 +79,9 @@ class BookingService extends ChangeNotifier {
     required String bookingDate,
     required String timeSlot,
     String? staffId,
+    required String healthcareRight,
+    String? nationalId,
+    String channel = 'app',
   }) async {
     _error = null;
     try {
@@ -87,6 +90,10 @@ class BookingService extends ChangeNotifier {
         'bookingDate': bookingDate,
         'timeSlot': timeSlot,
         if (staffId != null) 'staffId': staffId,
+        'healthcareRight': healthcareRight,
+        if (nationalId != null && nationalId.isNotEmpty)
+          'nationalId': nationalId,
+        'channel': channel,
       });
       final booking = BookingModel.fromMap(
         data['booking']['id'],

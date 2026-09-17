@@ -12,6 +12,7 @@ let queueStatus = { currentQueue: null };
 const STATUS_LABEL = {
   pending:    'รอยืนยัน',
   confirmed:  'ยืนยันแล้ว',
+  auto_called:'เรียกอัตโนมัติ',
   in_service: 'กำลังให้บริการ',
   done:       'นวดเสร็จแล้ว',
   cancelled:  'ยกเลิก',
@@ -19,6 +20,7 @@ const STATUS_LABEL = {
 const STATUS_BADGE = {
   pending:    'badge-yellow',
   confirmed:  'badge-blue',
+  auto_called:'badge-orange',
   in_service: 'badge-blue',
   done:       'badge-green',
   cancelled:  'badge-red',
@@ -371,6 +373,8 @@ function renderBookingsTable() {
       <td>${b.timeSlot}</td>
       <td>${b.customerName || b.userName || '-'}</td>
       <td>${b.customerPhone || '-'}</td>
+      <td><span class="badge badge-right">${b.healthcareRightLabel || 'จ่ายตรง'}</span></td>
+      <td>${b.channel === 'walk-in' ? 'Walk-in' : b.channel === 'web' ? 'Web' : 'App'}</td>
       <td>${b.serviceName}</td>
       <td>${b.staffName || '-'}</td>
       <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
@@ -381,7 +385,7 @@ function renderBookingsTable() {
         ` : ''}
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
+  `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
 }
 
 async function markDone(id) {
@@ -419,6 +423,9 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
       serviceId, staffId, bookingDate: date, timeSlot: time,
       customerName: name,
       customerPhone: document.getElementById('f-phone').value.trim(),
+      healthcareRight: document.getElementById('f-right').value,
+      nationalId: document.getElementById('f-national-id').value.trim(),
+      channel: 'walk-in',
     });
     await loadBookings();
     e.target.reset();
@@ -432,11 +439,14 @@ function renderQueuePage() {
   const list = bookings.filter(matchesBookingSearch);
   const current  = list.find(b => b.queueNumber === queueStatus.currentQueue)
     || list.find(b => b.status === 'in_service');
-  const waiting  = list.filter(b => ['pending', 'confirmed'].includes(b.status))
+  const waiting  = list.filter(b => ['pending', 'confirmed', 'auto_called'].includes(b.status))
     .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
   const done     = list.filter(b => b.status === 'done');
 
   document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
+  document.getElementById('queue-current-details').innerHTML = current
+    ? `${current.serviceName || '-'} · ${current.healthcareRightLabel || 'จ่ายตรง'}<br>${current.staffName || '-'} · ${current.timeSlot || '-'}`
+    : 'ยังไม่มีคิวกำลังให้บริการ';
   document.getElementById('queue-waiting-count').textContent = `${waiting.length} คิว`;
   document.getElementById('queue-done-count').textContent    = `${done.length} คิว`;
   document.getElementById('queue-list-count').textContent    = `${waiting.length} คิว`;
@@ -447,6 +457,8 @@ function renderQueuePage() {
       <td>${b.timeSlot}</td>
       <td>${b.customerName || b.userName || '-'}</td>
       <td>${b.customerPhone || '-'}</td>
+      <td><span class="badge badge-right">${b.healthcareRightLabel || 'จ่ายตรง'}</span></td>
+      <td>${b.channel === 'walk-in' ? 'Walk-in' : b.channel === 'web' ? 'Web' : 'App'}</td>
       <td>${b.serviceName}</td>
       <td>${b.staffName || '-'}</td>
       <td><span class="badge ${STATUS_BADGE[b.status]}">${STATUS_LABEL[b.status]}</span></td>
@@ -455,7 +467,7 @@ function renderQueuePage() {
         <button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
+  `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
 }
 
 function matchesBookingSearch(booking) {
@@ -519,8 +531,22 @@ function renderNotifications(list) {
       <td>${n.customerPhone || '-'}</td>
       <td>${n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH') : '-'}</td>
       <td><span class="badge ${n.confirmed ? 'badge-green' : 'badge-yellow'}">${n.confirmed ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}</span></td>
+      <td>
+        ${n.customerPhone ? `<a class="action-btn btn-call" href="tel:${n.customerPhone}"><i class="fa-solid fa-phone"></i> โทร</a>` : ''}
+        ${!n.confirmed ? `<button class="action-btn btn-edit" onclick="resendNotification('${n.id}')"><i class="fa-solid fa-paper-plane"></i> ส่งซ้ำ</button>` : ''}
+      </td>
     </tr>
-  `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--slate)">ยังไม่มีการแจ้งเตือน</td></tr>';
+  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--slate)">ยังไม่มีการแจ้งเตือน</td></tr>';
+}
+
+async function resendNotification(id) {
+  try {
+    await API.resendNotification(id);
+    showToast('ส่งแจ้งเตือนซ้ำแล้ว ✓');
+    await loadNotifications();
+  } catch (err) {
+    showToast(`ส่งแจ้งเตือนซ้ำไม่สำเร็จ: ${err.message}`);
+  }
 }
 
 // ── Google Sheets sync ──────────────────────────────────────

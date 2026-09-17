@@ -143,6 +143,13 @@ const API = {
     });
   },
 
+  async resendNotification(id) {
+    return this._request(`/notifications/${id}/resend`, {
+      method: 'POST',
+      headers: await this._headers(),
+    });
+  },
+
   async getReport() {
     return this._request('/admin/report', { headers: await this._headers() });
   },

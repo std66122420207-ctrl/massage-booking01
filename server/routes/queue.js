@@ -31,7 +31,7 @@ router.get('/my', verifyToken, async (req, res) => {
     const mySnap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('userId', '==', req.user.uid)
       .where('bookingDate', '==', today)
-      .where('status', 'in', ['pending', 'confirmed'])
+      .where('status', 'in', ['pending', 'confirmed', 'auto_called'])
       .get();
 
     if (mySnap.empty) {
@@ -43,7 +43,7 @@ router.get('/my', verifyToken, async (req, res) => {
     // นับคิวที่อยู่ข้างหน้า
     const aheadSnap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('bookingDate', '==', today)
-      .where('status', 'in', ['pending', 'confirmed'])
+      .where('status', 'in', ['pending', 'confirmed', 'auto_called'])
       .where('timeSlot', '<', myBooking.timeSlot)
       .get();
 
@@ -68,8 +68,8 @@ router.post('/call-next', verifyToken, requireAdmin, async (req, res) => {
       .where('bookingDate', '==', today)
       .get();
 
-    const next = snap.docs
-      .filter(doc => ['pending', 'confirmed'].includes(doc.data().status))
+      const next = snap.docs
+        .filter(doc => ['pending', 'confirmed', 'auto_called'].includes(doc.data().status))
       .sort((a, b) => String(a.data().timeSlot || '').localeCompare(String(b.data().timeSlot || '')))
       .at(0);
 
@@ -138,7 +138,7 @@ router.post('/call', verifyToken, requireAdmin, async (req, res) => {
     if (!doc.exists) return res.status(404).json({ error: 'ไม่พบการจอง' });
     const data = doc.data();
     if (data.bookingDate !== today) return res.status(400).json({ error: 'เรียกได้เฉพาะคิวของวันนี้' });
-    if (!['pending', 'confirmed'].includes(data.status)) {
+    if (!['pending', 'confirmed', 'auto_called'].includes(data.status)) {
       return res.status(409).json({ error: 'คิวนี้ไม่อยู่ในสถานะรอเรียก' });
     }
 

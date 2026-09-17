@@ -22,10 +22,29 @@ router.get('/', verifyToken, async (req, res) => {
 
 // ── POST /api/bookings — สร้างการจองใหม่ ───────────────────
 router.post('/', verifyToken, async (req, res) => {
-  const { serviceId, staffId, bookingDate, timeSlot, customerName, customerPhone } = req.body;
+  const {
+    serviceId, staffId, bookingDate, timeSlot, customerName, customerPhone,
+    healthcareRight = 'direct', nationalId, channel = 'app',
+  } = req.body;
+  const allowedRights = ['universal', 'social_security', 'direct'];
+  const rightLabels = {
+    universal: 'บัตรทอง',
+    social_security: 'ประกันสังคม',
+    direct: 'จ่ายตรง',
+  };
 
   if (!serviceId || !staffId || !bookingDate || !timeSlot) {
     return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบ' });
+  }
+  if (!allowedRights.includes(healthcareRight)) {
+    return res.status(400).json({ error: 'สิทธิการรักษาไม่ถูกต้อง' });
+  }
+  const normalizedNationalId = String(nationalId || '').replace(/[\s-]/g, '');
+  if (healthcareRight !== 'direct' && !/^[0-9]{13}$/.test(normalizedNationalId)) {
+    return res.status(400).json({ error: 'กรุณาระบุเลขบัตรประชาชน 13 หลักสำหรับสิทธินี้' });
+  }
+  if (!['app', 'web', 'walk-in'].includes(channel)) {
+    return res.status(400).json({ error: 'ช่องทางการจองไม่ถูกต้อง' });
   }
 
   // ใช้ค่าจองล่วงหน้าจากการตั้งค่าของแอดมิน (ค่าเริ่มต้น 3 วัน)
@@ -90,6 +109,21 @@ router.post('/', verifyToken, async (req, res) => {
         throw Object.assign(new Error('เวลานี้ถูกจองแล้ว กรุณาเลือกเวลาอื่น'), { code: 409 });
       }
 
+      if (healthcareRight !== 'direct') {
+        const sameDayBookings = await t.get(
+          db.collection(COLLECTIONS.BOOKINGS).where('bookingDate', '==', bookingDate)
+        );
+        const rightAlreadyUsed = sameDayBookings.docs.some((doc) => {
+          const existing = doc.data();
+          return existing.nationalId === normalizedNationalId
+            && existing.healthcareRight === healthcareRight
+            && !['cancelled', 'done'].includes(existing.status);
+        });
+        if (rightAlreadyUsed) {
+          throw Object.assign(new Error('สิทธินี้ถูกใช้งานแล้วในวันนี้'), { code: 409 });
+        }
+      }
+
       const counterRef = db.collection('counters').doc(bookingDate);
       const counterDoc = await t.get(counterRef);
       const n = (counterDoc.exists ? counterDoc.data().count : 0) + 1;
@@ -101,6 +135,10 @@ router.post('/', verifyToken, async (req, res) => {
         userId:       req.user.uid,
         customerName: resolvedCustomerName || null,
         customerPhone: resolvedCustomerPhone || null,
+        healthcareRight,
+        healthcareRightLabel: rightLabels[healthcareRight],
+        nationalId: normalizedNationalId || null,
+        channel,
         serviceId,
         serviceName:  service.name || '',
         servicePrice: service.price || 0,
@@ -144,7 +182,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
 // ── PATCH /api/bookings/:id — Admin: อัปเดตสถานะ ───────────
 router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
   const { status, staffId, room } = req.body;
-  const allowed = ['pending', 'confirmed', 'in_service', 'done', 'cancelled'];
+  const allowed = ['pending', 'confirmed', 'auto_called', 'in_service', 'done', 'cancelled'];
 
   if (status && !allowed.includes(status)) {
     return res.status(400).json({ error: 'สถานะไม่ถูกต้อง' });
@@ -227,6 +265,8 @@ router.get('/admin/today', verifyToken, requireAdmin, async (req, res) => {
           customerName: booking.customerName || user.name || '',
           customerPhone: booking.customerPhone || user.phone || '',
           staffName: staff.name || '',
+          healthcareRightLabel: booking.healthcareRightLabel || booking.healthcareRight || 'จ่ายตรง',
+          channel: booking.channel || 'app',
         };
       })
       .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));

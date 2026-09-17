@@ -245,7 +245,9 @@ class _BookingSheetState extends State<BookingSheet> {
   DateTime _selected = DateTime.now();
   String? _timeSlot;
   String? _staffId;
+  String _healthcareRight = 'direct';
   bool _submitting = false;
+  final _nationalIdController = TextEditingController();
 
   final _times = [
     '09:00',
@@ -261,6 +263,13 @@ class _BookingSheetState extends State<BookingSheet> {
     '15:00',
     '15:30'
   ];
+
+  @override
+  void dispose() {
+    _nationalIdController.dispose();
+    super.dispose();
+  }
+
   Future<void> _confirm() async {
     if (_staffId == null) {
       ScaffoldMessenger.of(context)
@@ -272,12 +281,24 @@ class _BookingSheetState extends State<BookingSheet> {
           .showSnackBar(const SnackBar(content: Text('กรุณาเลือกเวลา')));
       return;
     }
+    final nationalId =
+        _nationalIdController.text.replaceAll(RegExp(r'[\s-]'), '');
+    if (_healthcareRight != 'direct' &&
+        !RegExp(r'^\d{13}$').hasMatch(nationalId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('กรุณากรอกเลขบัตรประชาชน 13 หลักสำหรับสิทธินี้')),
+      );
+      return;
+    }
     setState(() => _submitting = true);
     final booking = await context.read<BookingService>().createBooking(
           serviceId: widget.service.id,
           bookingDate: DateFormat('yyyy-MM-dd').format(_selected),
           timeSlot: _timeSlot!,
           staffId: _staffId,
+          healthcareRight: _healthcareRight,
+          nationalId: nationalId,
         );
     if (!mounted) return;
     setState(() => _submitting = false);
@@ -317,6 +338,43 @@ class _BookingSheetState extends State<BookingSheet> {
                     borderRadius: BorderRadius.circular(2))),
           ),
           const SizedBox(height: 18),
+
+          const Text('สิทธิการรักษา',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF777777))),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: _healthcareRight,
+            decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.verified_user_outlined)),
+            items: const [
+              DropdownMenuItem(value: 'universal', child: Text('บัตรทอง')),
+              DropdownMenuItem(
+                  value: 'social_security', child: Text('ประกันสังคม')),
+              DropdownMenuItem(
+                  value: 'direct', child: Text('จ่ายตรง / ชำระเอง')),
+            ],
+            onChanged: (value) =>
+                setState(() => _healthcareRight = value ?? 'direct'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nationalIdController,
+            keyboardType: TextInputType.number,
+            maxLength: 13,
+            decoration: InputDecoration(
+              labelText: _healthcareRight == 'direct'
+                  ? 'เลขบัตรประชาชน / Member ID (ถ้ามี)'
+                  : 'เลขบัตรประชาชน 13 หลัก',
+              prefixIcon: const Icon(Icons.badge_outlined),
+              helperText: _healthcareRight == 'direct'
+                  ? 'จ่ายตรงไม่จำกัดสิทธิรายวัน'
+                  : 'ใช้สิทธิได้ 1 คิวต่อวัน',
+            ),
+          ),
+          const SizedBox(height: 4),
           Text('จองคิว – ${widget.service.name}',
               style: const TextStyle(
                   fontFamily: 'Sarabun',

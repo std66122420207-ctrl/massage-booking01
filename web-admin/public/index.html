@@ -93,15 +93,15 @@ body {
 }
 
 /* ── MAIN ── */
-.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; min-width: 0; overflow: hidden; }
 .topbar {
   height: var(--topbar-h); background: var(--white);
   border-bottom: 1px solid var(--border); padding: 0 28px;
   display: flex; align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 100;
+  position: sticky; top: 0; z-index: 100; min-width: 0;
 }
 .topbar h3 { font-family: 'Noto Serif Thai', serif; font-size: 16px; font-weight: 600; color: var(--forest); letter-spacing: -0.01em; }
-.topbar-right { display: flex; align-items: center; gap: 12px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
 .search-box {
   background: var(--mist); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 7px 14px 7px 34px; font-family: inherit; font-size: 13.5px; width: 220px;
@@ -120,7 +120,7 @@ body {
   width: 26px; height: 26px; background: var(--jade); border-radius: 50%;
   display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; font-weight: 700;
 }
-.content { padding: 24px 28px 40px; flex: 1; }
+.content { padding: 24px 28px 40px; flex: 1; min-width: 0; overflow-x: hidden; }
 .page { display: none; }
 .page.active { display: block; animation: fadeIn 0.18s ease; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
@@ -157,6 +157,8 @@ body {
 .badge-blue   { background: var(--status-confirm-bg); color: var(--status-confirm-text); }
 .badge-red    { background: var(--status-cancel-bg);  color: var(--status-cancel-text); }
 .badge-gray   { background: var(--status-done-bg);    color: var(--status-done-text); }
+.badge-orange { background: #FFF0E0; color: #B45309; }
+.badge-right { background: #E8F5EE; color: #1B6B43; white-space: nowrap; }
 
 /* ── CHART ── */
 .mini-chart { height: 110px; display: flex; align-items: flex-end; gap: 5px; }
@@ -177,7 +179,10 @@ body {
 .quick-btn:active { transform: scale(0.98); }
 
 /* ── TABLE ── */
-.table-wrap { overflow-x: auto; }
+.table-wrap { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+table { min-width: 760px; }
+.queue-layout { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.queue-layout > .card { min-width: 0; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 thead th {
   text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700;
@@ -327,7 +332,14 @@ tbody tr:hover td { background: var(--jade-pale); }
 @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 960px) {
   .charts-row, .form-grid, .staff-grid { grid-template-columns: 1fr; }
-  .sidebar { width: 210px; } .main { margin-left: 210px; }
+  .sidebar { position: static; width: 100%; min-height: auto; }
+  .sidebar-nav { display: flex; gap: 4px; overflow-x: auto; }
+  .nav-section-label, .sidebar-footer { display: none; }
+  .main { margin-left: 0; }
+  .queue-layout { grid-template-columns: 1fr; }
+  .topbar { height: auto; min-height: var(--topbar-h); padding: 12px 18px; }
+  .topbar-right { width: 100%; justify-content: flex-start; }
+  .content { padding: 18px; }
 }
 </style>
 </head>
@@ -453,6 +465,8 @@ tbody tr:hover td { background: var(--jade-pale); }
         <form id="booking-form" class="form-grid">
           <div class="form-group"><label>ชื่อผู้รับบริการ</label><input type="text" id="f-name" placeholder="ชื่อ-นามสกุล" required></div>
           <div class="form-group"><label>เบอร์โทร</label><input type="text" id="f-phone" placeholder="08X-XXX-XXXX"></div>
+          <div class="form-group"><label>สิทธิการรักษา</label><select id="f-right"><option value="universal">บัตรทอง</option><option value="social_security">ประกันสังคม</option><option value="direct">จ่ายตรง / ชำระเอง</option></select></div>
+          <div class="form-group"><label>เลขบัตรประชาชน / Member ID</label><input type="text" id="f-national-id" maxlength="13" placeholder="ใช้ตรวจสิทธิซ้ำรายวัน"></div>
           <div class="form-group"><label>บริการ</label><select id="f-service"></select></div>
           <div class="form-group"><label>หมอนวด</label><select id="f-staff"></select></div>
           <div class="form-group"><label>วันที่</label><input type="date" id="f-date" required></div>
@@ -476,7 +490,7 @@ tbody tr:hover td { background: var(--jade-pale); }
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>คิว</th><th>เวลา</th><th>ชื่อลูกค้า</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+            <thead><tr><th>คิว</th><th>เวลา</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
             <tbody id="bookings-tbody"></tbody>
           </table>
         </div>
@@ -485,12 +499,13 @@ tbody tr:hover td { background: var(--jade-pale); }
 
     <!-- QUEUE -->
     <section id="page-queue" class="page">
-      <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px">
+      <div class="queue-layout">
         <div class="card">
           <div class="card-header"><h4>สถานะคิวปัจจุบัน</h4></div>
           <div style="text-align:center;padding:16px 0 12px">
             <p style="font-size:11px;color:var(--slate);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px">กำลังให้บริการ</p>
             <div class="queue-current-num" id="queue-current">-</div>
+            <div id="queue-current-details" style="font-size:13px;color:var(--slate);line-height:1.8;margin-top:10px">ยังไม่มีคิวกำลังให้บริการ</div>
           </div>
           <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
           <div style="display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0">
@@ -508,7 +523,7 @@ tbody tr:hover td { background: var(--jade-pale); }
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>คิว</th><th>เวลาจอง</th><th>ชื่อลูกค้า</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+              <thead><tr><th>คิว</th><th>เวลาจอง</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
               <tbody id="queue-tbody"></tbody>
             </table>
           </div>
@@ -523,7 +538,7 @@ tbody tr:hover td { background: var(--jade-pale); }
           </p>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>ข้อความ</th><th>ลูกค้า</th><th>เบอร์โทร</th><th>เวลาแจ้ง</th><th>สถานะ</th></tr></thead>
+              <thead><tr><th>ข้อความ</th><th>ลูกค้า</th><th>เบอร์โทร</th><th>เวลาแจ้ง</th><th>สถานะ</th><th>การติดต่อ</th></tr></thead>
               <tbody id="notif-tbody"></tbody>
             </table>
           </div>

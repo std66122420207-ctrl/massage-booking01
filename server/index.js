@@ -18,6 +18,7 @@ const staffRoutes        = require('./routes/staff');
 const adminRoutes        = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
 const fcmRoutes          = require('./routes/fcm');
+const { startAutoCallWorker } = require('./services/autoCall');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -126,6 +127,7 @@ if (require.main === module) {
     console.log(`   API  → http://localhost:${PORT}/api`);
     console.log(`   Admin→ http://localhost:${PORT}\n`);
   });
+  startAutoCallWorker();
 }
 
 // ── Graceful shutdown ────────────────────────────────────────

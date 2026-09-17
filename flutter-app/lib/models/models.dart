@@ -88,6 +88,9 @@ class BookingModel {
   final String timeSlot; // HH:mm
   final String queueNumber; // A001
   final String status; // pending|confirmed|in_service|done|cancelled
+  final String healthcareRight;
+  final String? nationalId;
+  final String channel;
   final DateTime? createdAt;
 
   const BookingModel({
@@ -102,6 +105,9 @@ class BookingModel {
     required this.timeSlot,
     required this.queueNumber,
     required this.status,
+    this.healthcareRight = 'direct',
+    this.nationalId,
+    this.channel = 'app',
     this.createdAt,
   });
 
@@ -118,6 +124,9 @@ class BookingModel {
       timeSlot: m['timeSlot'] ?? '',
       queueNumber: m['queueNumber'] ?? '',
       status: m['status'] ?? 'pending',
+      healthcareRight: m['healthcareRight'] ?? 'direct',
+      nationalId: m['nationalId'],
+      channel: m['channel'] ?? 'app',
       createdAt: _parseFirestoreTimestamp(m['createdAt']),
     );
   }
