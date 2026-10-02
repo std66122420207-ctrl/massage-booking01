@@ -84,6 +84,7 @@ class BookingModel {
   final int servicePrice;
   final String? staffId;
   final String? staffName;
+  final String? staffPhoto;
   final String bookingDate; // yyyy-MM-dd
   final String timeSlot; // HH:mm
   final String queueNumber; // A001
@@ -101,6 +102,7 @@ class BookingModel {
     required this.servicePrice,
     this.staffId,
     this.staffName,
+    this.staffPhoto,
     required this.bookingDate,
     required this.timeSlot,
     required this.queueNumber,
@@ -120,6 +122,7 @@ class BookingModel {
       servicePrice: m['servicePrice'] ?? 0,
       staffId: m['staffId'],
       staffName: m['staffName'],
+      staffPhoto: m['staffPhoto'],
       bookingDate: m['bookingDate'] ?? '',
       timeSlot: m['timeSlot'] ?? '',
       queueNumber: m['queueNumber'] ?? '',
@@ -135,6 +138,7 @@ class BookingModel {
     const map = {
       'pending': 'รอยืนยัน',
       'confirmed': 'ยืนยันแล้ว',
+      'auto_called': 'เรียกคิวแล้ว',
       'in_service': 'กำลังให้บริการ',
       'done': 'เสร็จแล้ว',
       'cancelled': 'ยกเลิก',
@@ -162,10 +166,28 @@ class UserModel {
   factory UserModel.fromMap(Map<String, dynamic> m) {
     return UserModel(
       uid: m['uid'] ?? '',
-      name: m['name'] ?? '',
+      name: (m['name'] ?? '').toString().trim().isNotEmpty
+          ? (m['name'] ?? '').toString().trim()
+          : 'ผู้ใช้',
       phone: m['phone'],
       loginMethod: m['loginMethod'] ?? 'phone',
       needsPhone: m['needsPhone'] ?? (m['phone'] == null),
+    );
+  }
+
+  UserModel copyWith({
+    String? uid,
+    String? name,
+    String? phone,
+    String? loginMethod,
+    bool? needsPhone,
+  }) {
+    return UserModel(
+      uid: uid ?? this.uid,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      loginMethod: loginMethod ?? this.loginMethod,
+      needsPhone: needsPhone ?? this.needsPhone,
     );
   }
 }

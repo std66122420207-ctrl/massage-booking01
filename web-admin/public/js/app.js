@@ -6,8 +6,17 @@
 let services = [];
 let staffList = [];
 let bookings = [];
+let dashboardBookings = [];
+let upcomingBookings = [];
 let bookingSearch = '';
 let queueStatus = { currentQueue: null };
+
+function localDateValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 const STATUS_LABEL = {
   pending:    'รอยืนยัน',
@@ -306,14 +315,21 @@ staffModalForm.addEventListener('submit', async (e) => {
 
 async function loadBookings() {
   try {
-    const [todayBookings, currentQueue] = await Promise.all([
+    const selectedDate = document.getElementById('dashboard-date').value || localDateValue();
+    const [todayBookings, currentQueue, selectedDayBookings, futureBookings] = await Promise.all([
       API.getTodayBookings(),
       API.getQueueStatus(),
+      API.getBookingsByDate(selectedDate),
+      API.getUpcomingBookings(),
     ]);
     bookings = todayBookings;
     queueStatus = currentQueue || { currentQueue: null };
+    dashboardBookings = selectedDayBookings;
+    upcomingBookings = futureBookings;
   } catch (err) {
     bookings = [];
+    dashboardBookings = [];
+    upcomingBookings = [];
     queueStatus = { currentQueue: null };
     noteOfflineFallback();
     showToast(`โหลดการจองไม่สำเร็จ: ${err.message}`);
@@ -321,7 +337,56 @@ async function loadBookings() {
 
   renderBookingsTable();
   renderDashboardStats();
+  renderDashboardDayBookings();
   renderQueuePage();
+}
+
+async function loadDashboardDay(date) {
+  try {
+    dashboardBookings = await API.getBookingsByDate(date);
+  } catch (err) {
+    dashboardBookings = [];
+    showToast(`โหลดรายการวันนี้ไม่สำเร็จ: ${err.message}`);
+  }
+  renderDashboardDayBookings();
+}
+
+function renderDashboardDayBookings() {
+  const tbody = document.getElementById('dashboard-day-tbody');
+  if (!tbody) return;
+  const rows = dashboardBookings.filter(matchesBookingSearch);
+  tbody.innerHTML = rows.map((booking) => `
+    <tr>
+      <td class="queue-id">${booking.queueNumber || '-'}</td>
+      <td>${booking.timeSlot || '-'}</td>
+      <td>${booking.customerName || '-'}</td>
+      <td>${booking.customerPhone || '-'}</td>
+      <td>${booking.serviceName || '-'}</td>
+      <td>${booking.staffName || '-'}</td>
+      <td><span class="badge badge-right">${booking.healthcareRightLabel || 'จ่ายตรง'}</span></td>
+      <td><span class="badge ${STATUS_BADGE[booking.status] || 'badge-gray'}">${STATUS_LABEL[booking.status] || booking.status}</span></td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">ไม่มีรายการจองในวันที่เลือก</td></tr>';
+}
+
+function renderUpcomingBookings() {
+  const tbody = document.getElementById('upcoming-bookings-tbody');
+  if (!tbody) return;
+  const rows = upcomingBookings.filter(matchesBookingSearch);
+  document.getElementById('upcoming-booking-count').textContent = `${rows.length} รายการ`;
+  tbody.innerHTML = rows.map((booking) => `
+    <tr>
+      <td>${new Date(`${booking.bookingDate}T00:00:00`).toLocaleDateString('th-TH')}</td>
+      <td class="queue-id">${booking.queueNumber || '-'}</td>
+      <td>${booking.timeSlot || '-'}</td>
+      <td>${booking.customerName || '-'}</td>
+      <td>${booking.customerPhone || '-'}</td>
+      <td>${booking.serviceName || '-'}</td>
+      <td>${booking.staffName || '-'}</td>
+      <td><span class="badge badge-right">${booking.healthcareRightLabel || 'จ่ายตรง'}</span></td>
+      <td><span class="badge ${STATUS_BADGE[booking.status] || 'badge-gray'}">${STATUS_LABEL[booking.status] || booking.status}</span></td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--slate);padding:24px">ไม่มีการจองล่วงหน้า</td></tr>';
 }
 
 // ── Dashboard ───────────────────────────────────────────────
@@ -468,6 +533,7 @@ function renderQueuePage() {
       </td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
+  renderUpcomingBookings();
 }
 
 function matchesBookingSearch(booking) {
@@ -481,7 +547,12 @@ function matchesBookingSearch(booking) {
 document.querySelector('.search-box')?.addEventListener('input', (event) => {
   bookingSearch = event.target.value.trim().toLowerCase();
   renderBookingsTable();
+  renderDashboardDayBookings();
   renderQueuePage();
+});
+
+document.getElementById('dashboard-date').addEventListener('change', (event) => {
+  loadDashboardDay(event.target.value || localDateValue());
 });
 
 async function callSpecific(id) {
@@ -652,6 +723,7 @@ async function loadSettings() {
 // ── Init ────────────────────────────────────────────────────
 async function init() {
   document.getElementById('f-date').valueAsDate = new Date();
+  document.getElementById('dashboard-date').value = localDateValue();
 
   await loadServices();
   await loadStaff();

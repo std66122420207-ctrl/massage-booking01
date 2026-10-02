@@ -220,6 +220,8 @@ tbody tr:hover td { background: var(--jade-pale); }
 .form-group input:focus, .form-group select:focus {
   border-color: var(--jade); background: var(--white); box-shadow: 0 0 0 3px rgba(46,125,82,0.1);
 }
+#dashboard-date { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--forest); background: var(--mist); font: inherit; }
+#dashboard-date:focus { outline: 2px solid rgba(46,125,82,0.25); border-color: var(--jade); }
 .btn-primary {
   background: var(--jade); color: #fff; border: none; border-radius: var(--radius-sm);
   padding: 10px 22px; font-family: inherit; font-size: 14px; font-weight: 600;
@@ -457,6 +459,21 @@ tbody tr:hover td { background: var(--jade-pale); }
           </div>
         </div>
       </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-header">
+          <div>
+            <h4>รายชื่อการจองประจำวัน</h4>
+            <small style="color:var(--slate)">เลือกวันที่เพื่อดูรายชื่อลูกค้าและคิวของวันนั้น</small>
+          </div>
+          <input type="date" id="dashboard-date" aria-label="เลือกวันที่สำหรับรายการจอง">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>คิว</th><th>เวลา</th><th>ลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สิทธิ</th><th>สถานะ</th></tr></thead>
+            <tbody id="dashboard-day-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- BOOKINGS -->
@@ -526,6 +543,18 @@ tbody tr:hover td { background: var(--jade-pale); }
             <table>
               <thead><tr><th>คิว</th><th>เวลาจอง</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
               <tbody id="queue-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header">
+            <h4>รายการจองล่วงหน้าทั้งหมด</h4>
+            <span class="badge badge-blue" id="upcoming-booking-count">0 รายการ</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>วันที่</th><th>คิว</th><th>เวลา</th><th>ลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สิทธิ</th><th>สถานะ</th></tr></thead>
+              <tbody id="upcoming-bookings-tbody"></tbody>
             </table>
           </div>
         </div>

@@ -128,10 +128,14 @@ class BookingService extends ChangeNotifier {
           servicePrice: old.servicePrice,
           staffId: old.staffId,
           staffName: old.staffName,
+          staffPhoto: old.staffPhoto,
           bookingDate: old.bookingDate,
           timeSlot: old.timeSlot,
           queueNumber: old.queueNumber,
           status: 'cancelled',
+          healthcareRight: old.healthcareRight,
+          nationalId: old.nationalId,
+          channel: old.channel,
           createdAt: old.createdAt,
         );
         notifyListeners();

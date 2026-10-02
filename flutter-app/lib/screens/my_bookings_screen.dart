@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../services/booking_service.dart';
 import '../models/models.dart';
 
@@ -16,9 +17,19 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   @override
   Widget build(BuildContext context) {
     final all = context.watch<BookingService>().bookings;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final upcoming = all
-        .where((b) => b.status == 'pending' || b.status == 'confirmed')
-        .toList();
+        .where((b) =>
+            b.bookingDate.compareTo(today) >= 0 &&
+            (b.status == 'pending' ||
+                b.status == 'confirmed' ||
+                b.status == 'auto_called' ||
+                b.status == 'in_service'))
+        .toList()
+      ..sort((a, b) {
+        final dateOrder = a.bookingDate.compareTo(b.bookingDate);
+        return dateOrder != 0 ? dateOrder : a.timeSlot.compareTo(b.timeSlot);
+      });
     final history = all
         .where((b) => b.status == 'done' || b.status == 'cancelled')
         .toList();
@@ -41,7 +52,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 Expanded(
                     child: _tabBtn(
                         Icons.schedule_outlined,
-                        'ที่รออยู่',
+                        'จองล่วงหน้า',
                         _showUpcoming,
                         () => setState(() => _showUpcoming = true))),
                 Expanded(
@@ -118,6 +129,7 @@ class _BookingCard extends StatelessWidget {
   static const _statusColor = {
     'pending': Color(0xFFFFF3CD),
     'confirmed': Color(0xFFD1E7DD),
+    'auto_called': Color(0xFFFFE5C2),
     'in_service': Color(0xFFCFE2FF),
     'done': Color(0xFFE2E3E5),
     'cancelled': Color(0xFFF8D7DA),
@@ -125,6 +137,7 @@ class _BookingCard extends StatelessWidget {
   static const _statusText = {
     'pending': Color(0xFF856404),
     'confirmed': Color(0xFF0F5132),
+    'auto_called': Color(0xFF8A4B08),
     'in_service': Color(0xFF084298),
     'done': Color(0xFF41464B),
     'cancelled': Color(0xFF842029),
@@ -155,85 +168,155 @@ class _BookingCard extends StatelessWidget {
     }
   }
 
+  void _showDetails(BuildContext context) {
+    final date = DateTime.tryParse(booking.bookingDate);
+    final formattedDate = date == null
+        ? booking.bookingDate
+        : DateFormat('dd/MM/yyyy').format(date);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('รายละเอียดการจอง'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _detailRow('หมายเลขคิว', booking.queueNumber),
+            _detailRow('บริการ', booking.serviceName),
+            _detailRow('วันที่', formattedDate),
+            _detailRow('เวลา', '${booking.timeSlot} น.'),
+            _detailRow('หมอนวด', booking.staffName ?? '-'),
+            _detailRow('สิทธิการรักษา', _rightLabel(booking.healthcareRight)),
+            _detailRow('ค่าบริการ', '${booking.servicePrice} บาท'),
+            _detailRow('สถานะ', booking.statusLabel),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('ปิด'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+            width: 112,
+            child: Text(label, style: const TextStyle(color: Colors.black54)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ]),
+      );
+
+  String _rightLabel(String right) =>
+      const {
+        'universal': 'บัตรทอง',
+        'social_security': 'ประกันสังคม',
+        'direct': 'จ่ายตรง / ชำระเอง',
+      }[right] ??
+      right;
+
   @override
   Widget build(BuildContext context) {
     final canCancel =
-        booking.status == 'pending' || booking.status == 'confirmed';
+        ['pending', 'confirmed', 'auto_called'].contains(booking.status);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
-        ],
-      ),
-      child: Row(children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFF7A9E7E), Color(0xFF5A8A5E)]),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-              child: Text(booking.queueNumber,
-                  style: const TextStyle(
-                      fontFamily: 'Sarabun',
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      fontSize: 14))),
+    return GestureDetector(
+      onTap: () => _showDetails(context),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2))
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(booking.serviceName,
-              style: const TextStyle(
-                  fontFamily: 'Sarabun',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2D3B6B))),
-          const SizedBox(height: 3),
-          Text('${booking.bookingDate} · ${booking.timeSlot} น.',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF777777))),
-        ])),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _statusColor[booking.status] ?? Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(20),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [Color(0xFF7A9E7E), Color(0xFF5A8A5E)]),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                  child: Text(booking.queueNumber,
+                      style: const TextStyle(
+                          fontFamily: 'Sarabun',
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          fontSize: 14))),
             ),
-            child: Text(booking.statusLabel,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _statusText[booking.status] ?? Colors.black)),
-          ),
-          if (canCancel) ...[
-            const SizedBox(height: 6),
-            TextButton.icon(
-              onPressed: () => _confirmCancel(context),
-              icon: const Icon(Icons.cancel_outlined,
-                  size: 15, color: Colors.red),
-              label: const Text('ยกเลิก',
-                  style: TextStyle(fontSize: 11, color: Colors.red)),
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(booking.serviceName,
+                      style: const TextStyle(
+                          fontFamily: 'Sarabun',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2D3B6B))),
+                  const SizedBox(height: 3),
+                  Text('${booking.bookingDate} · ${booking.timeSlot} น.',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF777777))),
+                ])),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _statusColor[booking.status] ?? Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(booking.statusLabel,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _statusText[booking.status] ?? Colors.black)),
+              ),
+            ]),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, color: Color(0xFF829086)),
+          ]),
+          const Divider(height: 22),
+          Row(children: [
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () => _showDetails(context),
+                icon: const Icon(Icons.receipt_long_outlined, size: 17),
+                label: const Text('ดูรายละเอียด'),
+                style: TextButton.styleFrom(alignment: Alignment.centerLeft),
               ),
             ),
-          ],
+            if (canCancel)
+              TextButton.icon(
+                onPressed: () => _confirmCancel(context),
+                icon: const Icon(Icons.cancel_outlined,
+                    size: 17, color: Colors.red),
+                label: const Text('ยกเลิกคิว',
+                    style: TextStyle(color: Colors.red)),
+              ),
+          ]),
         ]),
-      ]),
+      ),
     );
   }
 }
