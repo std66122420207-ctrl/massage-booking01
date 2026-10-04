@@ -5,6 +5,20 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const googleSheets = require('../services/googleSheets');
 const mailer       = require('../services/mailer');
 
+function isBookingCounted(booking) {
+  return !!booking && booking.status !== 'cancelled';
+}
+
+function summarizeBookingCounts(bookings = []) {
+  const total = bookings.filter(isBookingCounted).length;
+  const done = bookings.filter((booking) => isBookingCounted(booking) && booking.status === 'done').length;
+  const revenue = bookings
+    .filter((booking) => isBookingCounted(booking) && booking.status === 'done')
+    .reduce((sum, booking) => sum + (Number(booking.servicePrice) || 0), 0);
+
+  return { total, done, cancelled: 0, revenue };
+}
+
 // ทุก route ในไฟล์นี้ใช้ได้เฉพาะแอดมิน
 router.use(verifyToken, requireAdmin);
 
@@ -112,16 +126,23 @@ router.get('/report', async (req, res) => {
       const booking = doc.data();
       const row = byDate[booking.bookingDate];
       if (!row) return;
+      if (booking.status === 'cancelled') {
+        row.cancelled += 1;
+        return;
+      }
       row.total += 1;
       if (booking.status === 'done') {
         row.done += 1;
         row.revenue += Number(booking.servicePrice) || 0;
       }
-      if (booking.status === 'cancelled') row.cancelled += 1;
     });
     res.json(Object.entries(byDate).map(([date, values]) => ({ date, ...values })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+module.exports = router;
+module.exports.isBookingCounted = isBookingCounted;
+module.exports.summarizeBookingCounts = summarizeBookingCounts;
 
 router.get('/settings', async (req, res) => {
   try {

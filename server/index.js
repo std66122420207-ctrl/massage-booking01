@@ -50,13 +50,48 @@ app.use(helmet({
 app.use(compression());
 app.use(morgan(isProd ? 'combined' : 'dev'));
 
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  delete req.headers['if-none-match'];
+  delete req.headers['if-modified-since'];
+  next();
+});
+
 // รองรับหลาย origin คั่นด้วย comma ใน FRONTEND_URL เช่น
 // "https://admin.example.com,https://app.example.com"
-const allowedOrigins = (process.env.FRONTEND_URL || '*')
+const defaultOrigins = [
+  'http://localhost:8080',
+  'http://localhost:8081',
+  'http://localhost:4000',
+  'http://localhost:3000',
+  'http://127.0.0.1:8080',
+  'http://127.0.0.1:8081',
+  'http://127.0.0.1:4000',
+  'http://127.0.0.1:3000',
+];
+const allowedOrigins = (process.env.FRONTEND_URL || defaultOrigins.join(','))
   .split(',')
-  .map((s) => s.trim());
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: allowedOrigins.includes('*') ? '*' : allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    const normalized = origin.replace(/\/?$/, '');
+    if (defaultOrigins.includes(normalized)) {
+      return callback(null, true);
+    }
+    if (!isProd && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 app.use(express.json({ limit: '1mb' }));

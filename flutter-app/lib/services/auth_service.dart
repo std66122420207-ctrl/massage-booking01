@@ -116,8 +116,13 @@ class AuthService extends ChangeNotifier {
     if (_verificationId == null) {
       throw Exception('กรุณาขอ OTP ใหม่อีกครั้ง');
     }
+    final safeName = name.trim();
+    if (safeName.isEmpty) {
+      throw Exception('กรุณากรอกชื่อ-นามสกุลก่อนยืนยัน OTP');
+    }
+
     _loading = true;
-    _pendingName = name;
+    _pendingName = safeName;
     notifyListeners();
 
     try {
@@ -130,8 +135,17 @@ class AuthService extends ChangeNotifier {
       if (userCred.user == null) {
         throw Exception('เข้าสู่ระบบไม่สำเร็จ');
       }
+
+      _user = UserModel(
+        uid: userCred.user!.uid,
+        name: safeName,
+        phone: userCred.user!.phoneNumber ?? '',
+        loginMethod: 'phone',
+      );
+      notifyListeners();
+
       await _registerOrLoadProfile(userCred.user!,
-          name: name, phone: userCred.user!.phoneNumber ?? '');
+          name: safeName, phone: userCred.user!.phoneNumber ?? '');
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e));
     } finally {
@@ -188,7 +202,13 @@ class AuthService extends ChangeNotifier {
       {required String fallbackLoginMethod}) async {
     try {
       final data = await ApiClient.get('/auth/me');
-      _user = UserModel.fromMap(Map<String, dynamic>.from(data));
+      final profile = Map<String, dynamic>.from(data);
+      final resolvedName = (profile['name'] ?? '').toString().trim();
+      _user = UserModel.fromMap(profile).copyWith(
+        name: resolvedName.isNotEmpty
+            ? resolvedName
+            : (_pendingName ?? fbUser.displayName ?? 'ผู้ใช้'),
+      );
     } on ApiException catch (e) {
       if (e.statusCode == 404) {
         // ยังไม่เคยลงทะเบียนโปรไฟล์ — ใช้ข้อมูลเท่าที่มีจาก Firebase ไปก่อน

@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
 
-      _notificationTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _notificationTimer = Timer.periodic(const Duration(seconds: 60), (_) {
         if (mounted) bookingService.loadNotifications();
       });
     });

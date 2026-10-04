@@ -77,8 +77,9 @@ const API = {
       headers: await this._headers(),
     });
   },
-  async getUpcomingBookings() {
-    return this._request('/bookings/admin/upcoming', {
+  async getUpcomingBookings(date = null) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this._request(`/bookings/admin/upcoming${query}`, {
       headers: await this._headers(),
     });
   },

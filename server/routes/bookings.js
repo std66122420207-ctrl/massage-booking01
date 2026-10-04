@@ -141,7 +141,8 @@ router.post('/', verifyToken, async (req, res) => {
         );
         const activeUserBooking = userBookings.docs.find((doc) => {
           const existing = doc.data();
-          return ['pending', 'confirmed', 'auto_called', 'in_service'].includes(existing.status);
+          return existing.bookingDate >= bangkokNow.date
+            && ['pending', 'confirmed', 'auto_called', 'in_service'].includes(existing.status);
         });
         if (activeUserBooking) {
           throw Object.assign(
@@ -329,12 +330,19 @@ router.get('/admin/by-date', verifyToken, requireAdmin, async (req, res) => {
 
 router.get('/admin/upcoming', verifyToken, requireAdmin, async (req, res) => {
   const today = getBangkokNow().date;
+  const selectedDate = String(req.query.date || '').trim();
+
   try {
-    const bookings = await getAdminBookings(
-      db.collection(COLLECTIONS.BOOKINGS).where('bookingDate', '>', today)
-    );
+    let query = db.collection(COLLECTIONS.BOOKINGS);
+    if (selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
+      query = query.where('bookingDate', '==', selectedDate);
+    } else {
+      query = query.where('bookingDate', '>', today);
+    }
+
+    const bookings = await getAdminBookings(query);
     res.json(bookings.filter((booking) =>
-      ['pending', 'confirmed', 'auto_called'].includes(booking.status)
+      booking.status !== 'cancelled' && ['pending', 'confirmed', 'auto_called'].includes(booking.status)
     ));
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -9,10 +10,45 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _nameKey = 'remembered_customer_name';
+  static const _phoneKey = 'remembered_customer_phone';
+  static const _rememberKey = 'remember_customer_identity';
+
   final _phoneCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
   bool _otpSent = false;
+  bool _rememberIdentity = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedIdentity();
+  }
+
+  Future<void> _loadSavedIdentity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool(_rememberKey) ?? true;
+    if (!mounted) return;
+    setState(() {
+      _rememberIdentity = remember;
+      _nameCtrl.text = remember ? (prefs.getString(_nameKey) ?? '') : '';
+      _phoneCtrl.text = remember ? (prefs.getString(_phoneKey) ?? '') : '';
+    });
+  }
+
+  Future<void> _saveIdentity() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberIdentity) {
+      await prefs.setBool(_rememberKey, true);
+      await prefs.setString(_nameKey, _nameCtrl.text.trim());
+      await prefs.setString(_phoneKey, _phoneCtrl.text.trim());
+    } else {
+      await prefs.setBool(_rememberKey, false);
+      await prefs.remove(_nameKey);
+      await prefs.remove(_phoneKey);
+    }
+  }
 
   @override
   void dispose() {
@@ -25,32 +61,51 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _sendOTP() async {
     final phone = _phoneCtrl.text.trim();
     final name = _nameCtrl.text.trim();
+    final authService = context.read<AuthService>();
+
     if (phone.isEmpty || name.isEmpty) {
-      _showSnack('กรุณากรอกชื่อและเบอร์โทร');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกชื่อและเบอร์โทร')),
+      );
       return;
     }
     try {
-      await context.read<AuthService>().sendOTP(phone);
+      if (_rememberIdentity) {
+        await _saveIdentity();
+      }
+      await authService.sendOTP(phone);
+      if (!mounted) return;
       setState(() => _otpSent = true);
     } catch (e) {
-      _showSnack('ส่ง OTP ไม่สำเร็จ: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ส่ง OTP ไม่สำเร็จ: $e')),
+      );
     }
   }
 
   Future<void> _verifyOTP() async {
+    final authService = context.read<AuthService>();
+
     try {
-      await context
-          .read<AuthService>()
-          .verifyOTP(_otpCtrl.text.trim(), _nameCtrl.text.trim());
-      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      await authService.verifyOTP(_otpCtrl.text.trim(), _nameCtrl.text.trim());
+      if (_rememberIdentity) {
+        await _saveIdentity();
+      }
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
-      _showSnack(
-          'ยืนยัน OTP ไม่สำเร็จ: ${e.toString().replaceFirst('Exception: ', '')}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'ยืนยัน OTP ไม่สำเร็จ: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
     }
   }
-
-  void _showSnack(String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +182,25 @@ class _LoginScreenState extends State<LoginScreen> {
               _field(_nameCtrl, 'ชื่อ-นามสกุล', TextInputType.name),
               const SizedBox(height: 12),
               _field(_phoneCtrl, 'เบอร์โทรศัพท์', TextInputType.phone),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _rememberIdentity,
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _rememberIdentity = value);
+                    },
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'จดจำชื่อและเบอร์โทรสำหรับล็อกอินครั้งต่อไป',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF4F4F4F)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               _buildButton(
                 onTap: auth.loading ? null : _sendOTP,
                 color: sage,

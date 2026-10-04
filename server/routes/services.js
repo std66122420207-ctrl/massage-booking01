@@ -9,15 +9,25 @@ const AVAILABLE_SERVICE_NAMES = new Set([
   'นวดเท้า',
   'นวดตัว',
   'กัวชา',
+  'กัวซา',
 ]);
 
 // GET /api/services — รายการบริการทั้งหมด
 router.get('/', async (req, res) => {
   try {
     const snap     = await db.collection(COLLECTIONS.SERVICES).orderBy('order').get();
-    const services = snap.docs
+    const filtered = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(service => service.active !== false && AVAILABLE_SERVICE_NAMES.has(service.name));
+      .filter(service => service.active !== false && AVAILABLE_SERVICE_NAMES.has(service.name))
+      .map(service => service.name === 'กัวชา'
+        ? { ...service, name: 'กัวซา', description: 'ดูแลผิวและลดความตึงด้วยศาสตร์กัวซา' }
+        : service);
+    const seenNames = new Set();
+    const services = filtered.filter((service) => {
+      if (seenNames.has(service.name)) return false;
+      seenNames.add(service.name);
+      return true;
+    });
     res.json(services);
   } catch (err) {
     res.status(500).json({ error: err.message });

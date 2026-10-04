@@ -7,11 +7,22 @@
     "source": ".",
     "runtime": "nodejs20"
   },
-  "hosting": {
-    "public": "web-admin/public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      { "source": "/api{,/**}", "function": { "functionId": "api", "region": "asia-southeast1" } }
-    ]
-  }
+  "hosting": [
+    {
+      "site": "massage-booking-ce032",
+      "public": "web-admin/public",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        { "source": "/api{,/**}", "function": { "functionId": "api", "region": "asia-southeast1" } }
+      ]
+    },
+    {
+      "site": "massage-booking-customer",
+      "public": "flutter-app/build/web",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [
+        { "source": "/api{,/**}", "function": { "functionId": "api", "region": "asia-southeast1" } }
+      ]
+    }
+  ]
 }

@@ -30,9 +30,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         final dateOrder = a.bookingDate.compareTo(b.bookingDate);
         return dateOrder != 0 ? dateOrder : a.timeSlot.compareTo(b.timeSlot);
       });
-    final history = all
-        .where((b) => b.status == 'done' || b.status == 'cancelled')
-        .toList();
+    final activeStatuses = [
+      'pending',
+      'confirmed',
+      'auto_called',
+      'in_service',
+    ];
+    final history = all.where((b) {
+      final isFinished = b.status == 'done' || b.status == 'cancelled';
+      final isExpiredActive = b.bookingDate.compareTo(today) < 0 &&
+          activeStatuses.contains(b.status);
+      return isFinished || isExpiredActive;
+    }).toList();
     final list = _showUpcoming ? upcoming : history;
 
     return Scaffold(
@@ -163,9 +172,22 @@ class _BookingCard extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true && context.mounted) {
-      await context.read<BookingService>().cancelBooking(booking.id);
-    }
+    if (ok != true || !context.mounted) return;
+
+    final bookingService = context.read<BookingService>();
+    final cancelled = await bookingService.cancelBooking(booking.id);
+    if (!context.mounted) return;
+    if (cancelled) await bookingService.loadMyBookings();
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(cancelled
+            ? 'ยกเลิกคิว ${booking.queueNumber} สำเร็จแล้ว'
+            : bookingService.error ?? 'ยกเลิกคิวไม่สำเร็จ กรุณาลองอีกครั้ง'),
+        backgroundColor: cancelled ? Colors.green : Colors.red,
+      ),
+    );
   }
 
   void _showDetails(BuildContext context) {

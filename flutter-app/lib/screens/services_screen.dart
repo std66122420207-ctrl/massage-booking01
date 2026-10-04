@@ -182,15 +182,26 @@ class _ServiceCard extends StatelessWidget {
     const ink = Color(0xFF17372D);
 
     return GestureDetector(
-      onTap: () {
-        final activeBookings = context
-            .read<BookingService>()
-            .bookings
-            .where((booking) => [
+      onTap: () async {
+        final bookingService = context.read<BookingService>();
+        await bookingService.loadMyBookings();
+        if (!context.mounted) return;
+        if (bookingService.error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(bookingService.error!)),
+          );
+          return;
+        }
+
+        final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        final activeBookings = bookingService.bookings
+            .where((booking) =>
+                booking.bookingDate.compareTo(today) >= 0 &&
+                [
                   'pending',
                   'confirmed',
                   'auto_called',
-                  'in_service'
+                  'in_service',
                 ].contains(booking.status))
             .toList();
         if (activeBookings.isNotEmpty) {
@@ -200,7 +211,7 @@ class _ServiceCard extends StatelessWidget {
             builder: (dialogContext) => AlertDialog(
               title: const Text('มีคิวที่ยังใช้งานอยู่'),
               content: Text(
-                'กรุณายกเลิกคิว ${active.queueNumber} ก่อนจึงจะจองคิวใหม่ได้',
+                'กรุณายกเลิกคิว ${active.queueNumber} วันที่ ${active.bookingDate} ก่อนจองคิวใหม่',
               ),
               actions: [
                 TextButton(

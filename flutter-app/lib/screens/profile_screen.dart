@@ -38,7 +38,10 @@ class ProfileScreen extends StatelessWidget {
                 child: const Icon(Icons.person, color: Colors.white, size: 36),
               ),
               const SizedBox(height: 14),
-              Text(auth.user?.name ?? 'ผู้ใช้',
+              Text(
+                  (auth.user?.name.trim().isNotEmpty ?? false)
+                      ? auth.user!.name
+                      : 'ผู้ใช้',
                   style: const TextStyle(
                       fontFamily: 'Sarabun',
                       fontSize: 18,
