@@ -10,7 +10,7 @@ const services = [
   { name: 'ประคบหินร้อน', duration: 90, price: 500, emoji: '🔥', description: 'ผ่อนคลายกล้ามเนื้อด้วยหินร้อน', order: 1, active: true },
   { name: 'นวดเท้า', duration: 45, price: 200, emoji: '🦶', description: 'นวดกดจุดและผ่อนคลายฝ่าเท้า', order: 2, active: true },
   { name: 'นวดตัว', duration: 60, price: 300, emoji: '💆', description: 'ผ่อนคลายกล้ามเนื้อทั่วร่างกาย', order: 3, active: true },
-  { name: 'กัวชา', duration: 60, price: 400, emoji: '🌿', description: 'ดูแลผิวและกล้ามเนื้อด้วยศาสตร์กัวชา', order: 4, active: true },
+  { name: 'กัวซา', duration: 60, price: 400, emoji: '🌿', description: 'ดูแลผิวและลดความตึงด้วยศาสตร์กัวซา', order: 4, active: true },
 ];
 
 const staff = [

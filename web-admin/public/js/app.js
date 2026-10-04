@@ -6,18 +6,8 @@
 let services = [];
 let staffList = [];
 let bookings = [];
-let dashboardBookings = [];
-let upcomingBookings = [];
 let bookingSearch = '';
-let queueFilter = 'all';
 let queueStatus = { currentQueue: null };
-
-function localDateValue(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 const STATUS_LABEL = {
   pending:    'รอยืนยัน',
@@ -316,19 +306,14 @@ staffModalForm.addEventListener('submit', async (e) => {
 
 async function loadBookings() {
   try {
-    const [todayBookings, currentQueue, futureBookings] = await Promise.all([
+    const [todayBookings, currentQueue] = await Promise.all([
       API.getTodayBookings(),
       API.getQueueStatus(),
-      API.getUpcomingBookings(document.getElementById('upcoming-date')?.value || null),
     ]);
-    bookings = todayBookings.filter((booking) => booking.status !== 'cancelled');
+    bookings = todayBookings;
     queueStatus = currentQueue || { currentQueue: null };
-    dashboardBookings = todayBookings.filter((booking) => booking.status !== 'cancelled');
-    upcomingBookings = futureBookings.filter((booking) => booking.status !== 'cancelled');
   } catch (err) {
     bookings = [];
-    dashboardBookings = [];
-    upcomingBookings = [];
     queueStatus = { currentQueue: null };
     noteOfflineFallback();
     showToast(`โหลดการจองไม่สำเร็จ: ${err.message}`);
@@ -336,68 +321,12 @@ async function loadBookings() {
 
   renderBookingsTable();
   renderDashboardStats();
-  renderDashboardDayBookings();
   renderQueuePage();
-}
-
-async function loadDashboardDay(date) {
-  try {
-    dashboardBookings = await API.getBookingsByDate(date);
-  } catch (err) {
-    dashboardBookings = [];
-    showToast(`โหลดรายการวันนี้ไม่สำเร็จ: ${err.message}`);
-  }
-  renderDashboardDayBookings();
-}
-
-function renderDashboardDayBookings() {
-  const tbody = document.getElementById('dashboard-day-tbody');
-  if (!tbody) return;
-  const rows = dashboardBookings.filter(matchesBookingSearch);
-  tbody.innerHTML = rows.map((booking) => `
-    <tr>
-      <td class="queue-id">${booking.queueNumber || '-'}</td>
-      <td>${booking.timeSlot || '-'}</td>
-      <td>${booking.customerName || '-'}</td>
-      <td>${booking.customerPhone || '-'}</td>
-      <td>${booking.serviceName || '-'}</td>
-      <td>${booking.staffName || '-'}</td>
-      <td><span class="badge badge-right">${booking.healthcareRightLabel || 'จ่ายตรง'}</span></td>
-      <td><span class="badge ${STATUS_BADGE[booking.status] || 'badge-gray'}">${STATUS_LABEL[booking.status] || booking.status}</span></td>
-    </tr>
-  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">ไม่มีรายการจองในวันที่เลือก</td></tr>';
-}
-
-function renderUpcomingBookings() {
-  const tbody = document.getElementById('upcoming-bookings-tbody');
-  if (!tbody) return;
-
-  const selectedDate = document.getElementById('upcoming-date')?.value || '';
-  const rows = upcomingBookings.filter((booking) => {
-    if (!matchesBookingSearch(booking)) return false;
-    if (!selectedDate) return true;
-    return booking.bookingDate === selectedDate;
-  });
-
-  document.getElementById('upcoming-booking-count').textContent = `${rows.length} รายการ`;
-  tbody.innerHTML = rows.map((booking) => `
-    <tr>
-      <td>${new Date(`${booking.bookingDate}T00:00:00`).toLocaleDateString('th-TH')}</td>
-      <td class="queue-id">${booking.queueNumber || '-'}</td>
-      <td>${booking.timeSlot || '-'}</td>
-      <td>${booking.customerName || '-'}</td>
-      <td>${booking.customerPhone || '-'}</td>
-      <td>${booking.serviceName || '-'}</td>
-      <td>${booking.staffName || '-'}</td>
-      <td><span class="badge badge-right">${booking.healthcareRightLabel || 'จ่ายตรง'}</span></td>
-      <td><span class="badge ${STATUS_BADGE[booking.status] || 'badge-gray'}">${STATUS_LABEL[booking.status] || booking.status}</span></td>
-    </tr>
-  `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--slate);padding:24px">ไม่มีการจองล่วงหน้า</td></tr>';
 }
 
 // ── Dashboard ───────────────────────────────────────────────
 function renderDashboardStats() {
-  const total   = bookings.filter(b => b.status !== 'cancelled').length;
+  const total   = bookings.length;
   const waiting = bookings.filter(b => ['pending', 'confirmed'].includes(b.status)).length;
   const done    = bookings.filter(b => b.status === 'done').length;
   const revenue = bookings.filter(b => b.status === 'done')
@@ -409,9 +338,10 @@ function renderDashboardStats() {
   document.getElementById('stat-waiting').textContent = waiting;
   document.getElementById('stat-done').textContent    = done;
   document.getElementById('stat-revenue').textContent = revenue.toLocaleString();
-  document.getElementById('stat-current').textContent = queueStatus.currentQueue
-    ? `กำลังให้บริการ: ${queueStatus.currentQueue}`
-    : current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
+  document.getElementById('stat-current').textContent = current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
+    document.getElementById('stat-current').textContent = queueStatus.currentQueue
+      ? `กำลังให้บริการ: ${queueStatus.currentQueue}`
+      : current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
   document.getElementById('stat-staff-count').textContent = staffList.length;
 
   buildTrendChart();
@@ -509,15 +439,9 @@ function renderQueuePage() {
   const list = bookings.filter(matchesBookingSearch);
   const current  = list.find(b => b.queueNumber === queueStatus.currentQueue)
     || list.find(b => b.status === 'in_service');
-
-  let waiting = list.filter(b => ['pending', 'confirmed', 'auto_called'].includes(b.status))
+  const waiting  = list.filter(b => ['pending', 'confirmed', 'auto_called'].includes(b.status))
     .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
-
-  if (queueFilter !== 'all') {
-    waiting = waiting.filter((b) => b.status === queueFilter);
-  }
-
-  const done = list.filter(b => b.status === 'done');
+  const done     = list.filter(b => b.status === 'done');
 
   document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
   document.getElementById('queue-current-details').innerHTML = current
@@ -543,8 +467,7 @@ function renderQueuePage() {
         <button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่ตรงกับตัวกรองนี้</td></tr>';
-  renderUpcomingBookings();
+  `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
 }
 
 function matchesBookingSearch(booking) {
@@ -558,27 +481,7 @@ function matchesBookingSearch(booking) {
 document.querySelector('.search-box')?.addEventListener('input', (event) => {
   bookingSearch = event.target.value.trim().toLowerCase();
   renderBookingsTable();
-  renderDashboardDayBookings();
   renderQueuePage();
-});
-
-document.querySelectorAll('.queue-filter').forEach((button) => {
-  button.addEventListener('click', () => {
-    queueFilter = button.dataset.queueFilter || 'all';
-    document.querySelectorAll('.queue-filter').forEach((item) => {
-      item.classList.toggle('active', item === button);
-    });
-    renderQueuePage();
-  });
-});
-
-document.getElementById('upcoming-date')?.addEventListener('change', async (event) => {
-  const date = event.target.value || null;
-  await loadBookings();
-  if (date) {
-    upcomingBookings = upcomingBookings.filter((booking) => booking.bookingDate === date);
-  }
-  renderUpcomingBookings();
 });
 
 async function callSpecific(id) {
@@ -749,7 +652,6 @@ async function loadSettings() {
 // ── Init ────────────────────────────────────────────────────
 async function init() {
   document.getElementById('f-date').valueAsDate = new Date();
-  document.getElementById('upcoming-date').value = '';
 
   await loadServices();
   await loadStaff();
@@ -758,7 +660,7 @@ async function init() {
   await renderReport();
   await loadSettings();
 
-  // Auto-refresh ทุก 60 วินาที; การเปลี่ยนแปลงด่วนยังโหลดได้ผ่านปุ่ม/FCM
-  setInterval(loadBookings, 60000);
-  setInterval(loadNotifications, 60000);
+  // Auto-refresh ทุก 15 วินาที
+  setInterval(loadBookings, 15000);
+  setInterval(loadNotifications, 15000);
 }

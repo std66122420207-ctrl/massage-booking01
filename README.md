@@ -1,6 +1,48 @@
 # 🌿 ระบบจองคิวนวดแผนไทย — ศูนย์สุขภาพชุมชนท่าวังหิน
 
-## 📝 การแก้ไขล่าสุด (Changelog)
+## � วิธีรันเร็วจาก root project
+
+```bash
+# backend API
+npm run dev:server
+
+# web admin (serve static files)
+npm run dev:admin
+
+# flutter web app
+npm run dev:flutter
+
+# ทดสอบ backend
+npm run test:server
+```
+
+> คำสั่งเหล่านี้ช่วยให้รันจาก root ของโปรเจคได้โดยตรง ไม่ต้องเข้าไปใน subfolder เองทุกครั้ง
+## 🚀 Deploy ไป Render
+
+```yaml
+# render.yaml
+services:
+  - type: web
+    name: massage-booking-api
+    env: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://your-app-domain.com
+      - key: APP_URL
+        value: https://your-app-domain.com
+```
+
+> เพิ่มค่าจริงใน Render Dashboard สำหรับ Firebase, ThaiD, Google Sheets, Gmail และ JWT_SECRET ก่อน deploy
+## �📝 การแก้ไขล่าสุด (Changelog)
 
 ### รอบ 9: เสร็จสมบูรณ์ 100% (Complete & Verified)
 - **Server:**

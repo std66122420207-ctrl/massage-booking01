@@ -3,6 +3,16 @@
   "private": true,
   "main": "functions/index.js",
   "engines": { "node": "20" },
+  "scripts": {
+    "dev:server": "cd server && npm run dev",
+    "start:server": "cd server && npm start",
+    "test:server": "cd server && npm test",
+    "dev:admin": "python -m http.server 8081 --directory web-admin/public",
+    "dev:flutter": "cd flutter-app && flutter run -d chrome --web-port 8080",
+    "build:flutter": "cd flutter-app && flutter build web",
+    "test:flutter": "cd flutter-app && flutter test",
+    "analyze:flutter": "cd flutter-app && flutter analyze"
+  },
   "dependencies": {
     "firebase-admin": "^12.3.0",
     "firebase-functions": "^6.1.0",

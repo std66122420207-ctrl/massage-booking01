@@ -2,6 +2,7 @@ const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { createNotification } = require('../routes/notifications');
 const { sendPushToUser } = require('../routes/fcm');
 const { sendSms } = require('./sms');
+const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused } = require('./firestoreGuard');
 
 const AUTO_CALL_LEAD_MINUTES = 15;
 const ACTIVE_STATUSES = ['pending', 'confirmed'];
@@ -40,9 +41,19 @@ async function deliverAutoNotification(booking, message, title, type) {
 
 async function autoConfirmDueBookings(now = new Date(), snapshot = null) {
   const today = getToday(now);
-  const snap = snapshot || await db.collection(COLLECTIONS.BOOKINGS)
-    .where('bookingDate', '==', today)
-    .get();
+  let snap;
+  try {
+    snap = snapshot || await db.collection(COLLECTIONS.BOOKINGS)
+      .where('bookingDate', '==', today)
+      .get();
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      markQuotaExceeded(error);
+      console.warn('Firestore quota exceeded while auto-confirming bookings; skipping cycle.');
+      return { checked: 0, confirmed: 0, quotaExceeded: true };
+    }
+    throw error;
+  }
 
   let confirmed = 0;
 
@@ -86,9 +97,19 @@ async function autoConfirmDueBookings(now = new Date(), snapshot = null) {
 
 async function autoCallUpcomingBookings(now = new Date(), snapshot = null) {
   const today = getToday(now);
-  const snap = snapshot || await db.collection(COLLECTIONS.BOOKINGS)
-    .where('bookingDate', '==', today)
-    .get();
+  let snap;
+  try {
+    snap = snapshot || await db.collection(COLLECTIONS.BOOKINGS)
+      .where('bookingDate', '==', today)
+      .get();
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      markQuotaExceeded(error);
+      console.warn('Firestore quota exceeded while auto-calling bookings; skipping cycle.');
+      return { checked: 0, called: 0, quotaExceeded: true };
+    }
+    throw error;
+  }
   const due = snap.docs.filter((doc) => {
     const booking = doc.data();
     if (!ACTIVE_STATUSES.includes(booking.status)) return false;
@@ -130,9 +151,19 @@ async function autoCallUpcomingBookings(now = new Date(), snapshot = null) {
 
 async function runAutoCallCycle(now = new Date()) {
   const today = getToday(now);
-  const snapshot = await db.collection(COLLECTIONS.BOOKINGS)
-    .where('bookingDate', '==', today)
-    .get();
+  let snapshot;
+  try {
+    snapshot = await db.collection(COLLECTIONS.BOOKINGS)
+      .where('bookingDate', '==', today)
+      .get();
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      markQuotaExceeded(error);
+      console.warn('Firestore quota exceeded for auto-call cycle; pausing cycle until quota resets.');
+      return { checked: 0, quotaExceeded: true, autoCall: { checked: 0, called: 0, quotaExceeded: true }, autoConfirm: { checked: 0, confirmed: 0, quotaExceeded: true } };
+    }
+    throw error;
+  }
 
   const [autoCall, autoConfirm] = await Promise.all([
     autoCallUpcomingBookings(now, snapshot),
@@ -142,11 +173,20 @@ async function runAutoCallCycle(now = new Date()) {
 }
 
 function startAutoCallWorker() {
-  const run = () => runAutoCallCycle().catch((error) => {
-    console.error('Auto-call worker cycle error:', error);
-  });
+  const run = () => {
+    if (isQuotaPaused()) {
+      console.warn('Free-tier safe mode active; skipping auto-call worker cycle.');
+      return Promise.resolve({ skipped: true, quotaExceeded: true });
+    }
+    return runAutoCallCycle().catch((error) => {
+      if (isQuotaExceededError(error)) {
+        markQuotaExceeded(error);
+      }
+      console.error('Auto-call worker cycle error:', error);
+    });
+  };
   run();
-  return setInterval(run, 60 * 1000);
+  return setInterval(run, 5 * 60 * 1000);
 }
 
 module.exports = {
@@ -156,4 +196,5 @@ module.exports = {
   startAutoCallWorker,
   getToday,
   appointmentDate,
+  isQuotaExceededError,
 };

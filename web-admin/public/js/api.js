@@ -72,17 +72,6 @@ const API = {
       headers: await this._headers(),
     });
   },
-  async getBookingsByDate(date) {
-    return this._request(`/bookings/admin/by-date?date=${encodeURIComponent(date)}`, {
-      headers: await this._headers(),
-    });
-  },
-  async getUpcomingBookings(date = null) {
-    const query = date ? `?date=${encodeURIComponent(date)}` : '';
-    return this._request(`/bookings/admin/upcoming${query}`, {
-      headers: await this._headers(),
-    });
-  },
   async getQueueStatus() {
     return this._request('/queue/status');
   },

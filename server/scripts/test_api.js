@@ -5,6 +5,7 @@
 require('dotenv').config();
 const http = require('http');
 const app  = require('../index');
+const { isBookingCounted, summarizeBookingCounts } = require('../routes/admin');
 
 async function runTests() {
   const PORT = 4321;
@@ -88,7 +89,27 @@ async function runTests() {
       }
     });
 
-    // 6. 404 handler
+    // 6. Cancelled bookings should not count as active bookings
+    await test('Cancelled bookings are excluded from active booking totals', async () => {
+      if (typeof isBookingCounted !== 'function') throw new Error('Expected isBookingCounted helper export');
+      if (typeof summarizeBookingCounts !== 'function') throw new Error('Expected summarizeBookingCounts helper export');
+
+      const items = [
+        { status: 'pending' },
+        { status: 'cancelled' },
+        { status: 'done' },
+        { status: 'confirmed' },
+      ];
+
+      const activeOnly = items.filter(isBookingCounted);
+      if (activeOnly.length !== 3) throw new Error(`Expected 3 active bookings, got ${activeOnly.length}`);
+
+      const summary = summarizeBookingCounts(items);
+      if (summary.total !== 3) throw new Error(`Expected total 3, got ${summary.total}`);
+      if (summary.cancelled !== 0) throw new Error(`Expected cancelled count 0, got ${summary.cancelled}`);
+    });
+
+    // 7. 404 handler
     await test('GET /api/unknown-route returns 404 JSON', async () => {
       const res = await request('/api/unknown-route');
       if (res.status !== 404) throw new Error(`Expected 404, got ${res.status}`);

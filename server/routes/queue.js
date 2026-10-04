@@ -4,56 +4,93 @@ const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { createNotification } = require('./notifications');
 const { sendPushToUser } = require('./fcm');
+const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue } = require('../services/firestoreGuard');
 
 // ── GET /api/queue/status — สถานะคิวปัจจุบัน (Public) ───────
 router.get('/status', async (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const cacheKey = `queue-status:${today}`;
+  const cached = getCachedValue(cacheKey, 30_000);
+  if (cached !== undefined) {
+    return res.json(cached);
+  }
+
+  if (isQuotaPaused()) {
+    const safeResponse = { currentQueue: null, waitingCount: 0, doneCount: 0, freeTierSafeMode: true };
+    setCachedValue(cacheKey, safeResponse, 30_000);
+    return res.json(safeResponse);
+  }
+
   try {
-    const today   = new Date().toISOString().split('T')[0];
-    const ref     = db.collection('queue_status').doc(today);
-    const doc     = await ref.get();
+    const ref = db.collection('queue_status').doc(today);
+    const doc = await ref.get();
 
     if (!doc.exists) {
-      return res.json({ currentQueue: null, waitingCount: 0, doneCount: 0 });
+      const response = { currentQueue: null, waitingCount: 0, doneCount: 0 };
+      setCachedValue(cacheKey, response, 30_000);
+      return res.json(response);
     }
 
-    res.json(doc.data());
+    const response = doc.data();
+    setCachedValue(cacheKey, response, 30_000);
+    res.json(response);
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      markQuotaExceeded(err);
+      const response = { currentQueue: null, waitingCount: 0, doneCount: 0, freeTierSafeMode: true };
+      setCachedValue(cacheKey, response, 30_000);
+      return res.json(response);
+    }
     res.status(500).json({ error: err.message });
   }
 });
 
 // ── GET /api/queue/my — ตำแหน่งคิวของผู้ใช้ ───────────────
 router.get('/my', verifyToken, async (req, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+  const cacheKey = `queue-my:${req.user.uid}:${today}`;
+  const cached = getCachedValue(cacheKey, 60_000);
+  if (cached !== undefined) {
+    return res.json(cached);
+  }
 
-    // หาการจองของผู้ใช้วันนี้
+  if (isQuotaPaused()) {
+    const safeResponse = { hasQueue: false, freeTierSafeMode: true, queuesBefore: 0, estimatedWait: 0 };
+    setCachedValue(cacheKey, safeResponse, 60_000);
+    return res.json(safeResponse);
+  }
+
+  try {
     const mySnap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('userId', '==', req.user.uid)
       .where('bookingDate', '==', today)
       .where('status', 'in', ['pending', 'confirmed', 'auto_called'])
+      .limit(20)
       .get();
 
     if (mySnap.empty) {
-      return res.json({ hasQueue: false });
+      const response = { hasQueue: false };
+      setCachedValue(cacheKey, response, 60_000);
+      return res.json(response);
     }
 
     const myBooking = { id: mySnap.docs[0].id, ...mySnap.docs[0].data() };
-
-    // นับคิวที่อยู่ข้างหน้า
-    const aheadSnap = await db.collection(COLLECTIONS.BOOKINGS)
-      .where('bookingDate', '==', today)
-      .where('status', 'in', ['pending', 'confirmed', 'auto_called'])
-      .where('timeSlot', '<', myBooking.timeSlot)
-      .get();
-
-    res.json({
-      hasQueue:      true,
-      booking:       myBooking,
-      queuesBefore:  aheadSnap.size,
-      estimatedWait: aheadSnap.size * 60, // ประมาณ 60 นาทีต่อคิว (วินาที)
-    });
+    const response = {
+      hasQueue: true,
+      booking: myBooking,
+      queuesBefore: 0,
+      estimatedWait: 0,
+      freeTierSafeMode: true,
+    };
+    setCachedValue(cacheKey, response, 60_000);
+    res.json(response);
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      markQuotaExceeded(err);
+      const response = { hasQueue: false, freeTierSafeMode: true, queuesBefore: 0, estimatedWait: 0 };
+      setCachedValue(cacheKey, response, 60_000);
+      return res.json(response);
+    }
     res.status(500).json({ error: err.message });
   }
 });

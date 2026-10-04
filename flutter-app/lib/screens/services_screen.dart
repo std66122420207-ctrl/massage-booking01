@@ -6,7 +6,6 @@ import '../services/booking_service.dart';
 import '../services/auth_service.dart';
 import '../models/models.dart';
 import 'notifications_screen.dart';
-import 'my_bookings_screen.dart';
 
 // ══ Services Screen ══════════════════════════════════════════
 class ServicesScreen extends StatelessWidget {
@@ -17,32 +16,31 @@ class ServicesScreen extends StatelessWidget {
     final auth = context.watch<AuthService>();
     final booking = context.watch<BookingService>();
     final services = booking.services;
-    const forest = Color(0xFF1E4D3B);
-    const ink = Color(0xFF17372D);
+    const sage = Color(0xFF7A9E7E);
+    const navy = Color(0xFF2D3B6B);
 
     return Scaffold(
       appBar: AppBar(
         title: Row(children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              color: const Color(0xFFE9F2EC),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE0E8E0)),
             ),
-            child: const Icon(Icons.local_hospital_outlined, color: forest),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child:
+                    Image.asset('assets/images/logo.jpeg', fit: BoxFit.contain),
+              ),
+            ),
           ),
           const SizedBox(width: 10),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('ท่าวังหิน', style: TextStyle(fontSize: 16, height: 1.1)),
-              SizedBox(height: 3),
-              Text('นวดแพทย์แผนไทยเพื่อสุขภาพ',
-                  style: TextStyle(fontSize: 10, color: Color(0xFF718078))),
-            ],
-          ),
+          const Text('ท่าวังหิน'),
         ]),
         actions: [
           Stack(
@@ -56,7 +54,7 @@ class ServicesScreen extends StatelessWidget {
                       builder: (_) => const NotificationsScreen()),
                 ),
               ),
-              if (booking.unconfirmedCount > 0)
+              if (context.watch<BookingService>().unconfirmedCount > 0)
                 Positioned(
                   right: 8,
                   top: 8,
@@ -67,7 +65,7 @@ class ServicesScreen extends StatelessWidget {
                     constraints:
                         const BoxConstraints(minWidth: 16, minHeight: 16),
                     child: Text(
-                      '${booking.unconfirmedCount}',
+                      '${context.watch<BookingService>().unconfirmedCount}',
                       style: const TextStyle(color: Colors.white, fontSize: 10),
                       textAlign: TextAlign.center,
                     ),
@@ -82,59 +80,38 @@ class ServicesScreen extends StatelessWidget {
         children: [
           // Greeting banner
           Container(
-            clipBehavior: Clip.antiAlias,
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E4D3B), Color(0xFF163A2D)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(colors: [sage, Color(0xFF5A8A5E)]),
+              borderRadius: BorderRadius.circular(18),
             ),
-            child: Stack(children: [
-              const Positioned(
-                  right: 20,
-                  top: 16,
-                  child: Icon(Icons.auto_awesome_outlined,
-                      size: 22, color: Color(0x668BC9A7))),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-                child: Row(children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('สวัสดี, ${auth.user?.name ?? 'คุณ'}',
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 14)),
-                        const SizedBox(height: 5),
-                        const Text('เลือกบริการนวดวันนี้',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'Sarabun')),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.spa_outlined,
-                      size: 44, color: Color(0x668BC9A7)),
-                ]),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('สวัสดี, ${auth.user?.name ?? 'คุณ'}',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 14)),
+                      const SizedBox(height: 4),
+                      const Text('เลือกบริการนวดวันนี้',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Sarabun')),
+                    ]),
               ),
+              const Icon(Icons.spa_outlined, size: 48, color: Colors.white24),
             ]),
           ),
           const SizedBox(height: 24),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('บริการของเรา',
-                style: TextStyle(
-                    fontFamily: 'Sarabun',
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: ink)),
-            Text('ทั้งหมด (${services.length})',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF718078))),
-          ]),
+          const Text('บริการของเรา',
+              style: TextStyle(
+                  fontFamily: 'Sarabun',
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: navy)),
           const SizedBox(height: 12),
 
           if (services.isEmpty)
@@ -178,80 +155,26 @@ class _ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const sage = Color(0xFF2D8B60);
-    const ink = Color(0xFF17372D);
+    const sage = Color(0xFF7A9E7E);
+    const navy = Color(0xFF2D3B6B);
 
     return GestureDetector(
-      onTap: () async {
-        final bookingService = context.read<BookingService>();
-        await bookingService.loadMyBookings();
-        if (!context.mounted) return;
-        if (bookingService.error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(bookingService.error!)),
-          );
-          return;
-        }
-
-        final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-        final activeBookings = bookingService.bookings
-            .where((booking) =>
-                booking.bookingDate.compareTo(today) >= 0 &&
-                [
-                  'pending',
-                  'confirmed',
-                  'auto_called',
-                  'in_service',
-                ].contains(booking.status))
-            .toList();
-        if (activeBookings.isNotEmpty) {
-          final active = activeBookings.first;
-          showDialog<void>(
-            context: context,
-            builder: (dialogContext) => AlertDialog(
-              title: const Text('มีคิวที่ยังใช้งานอยู่'),
-              content: Text(
-                'กรุณายกเลิกคิว ${active.queueNumber} วันที่ ${active.bookingDate} ก่อนจองคิวใหม่',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('ปิด'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MyBookingsScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text('ไปที่การจองของฉัน'),
-                ),
-              ],
-            ),
-          );
-          return;
-        }
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-          builder: (_) => BookingSheet(service: service),
-        );
-      },
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (_) => BookingSheet(service: service),
+      ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border:
-              const Border.fromBorderSide(BorderSide(color: Color(0xFFE5EBE7))),
+              const Border.fromBorderSide(BorderSide(color: Color(0xFFE0E8E0))),
           boxShadow: [
             BoxShadow(
                 color: Colors.black.withValues(alpha: 0.04),
@@ -261,11 +184,11 @@ class _ServiceCard extends StatelessWidget {
         ),
         child: Row(children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
-              color: const Color(0xFFF0F5F1),
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFEEF4EE),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Center(
               child: Icon(_serviceIcon(service.name), size: 28, color: sage),
@@ -279,19 +202,19 @@ class _ServiceCard extends StatelessWidget {
                 Text(service.name,
                     style: const TextStyle(
                         fontFamily: 'Sarabun',
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: ink)),
+                        color: navy)),
                 const SizedBox(height: 3),
                 Text(service.description,
                     style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF718078))),
+                        fontSize: 12, color: Color(0xFF777777))),
               ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text('${service.price} ฿',
                 style: const TextStyle(
                     fontFamily: 'Sarabun',
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: sage)),
             Text('${service.duration} นาที',
@@ -305,9 +228,7 @@ class _ServiceCard extends StatelessWidget {
   IconData _serviceIcon(String name) {
     if (name.contains('หินร้อน')) return Icons.local_fire_department_outlined;
     if (name.contains('เท้า')) return Icons.directions_walk_outlined;
-    if (name.contains('กัวชา') || name.contains('กัวซา')) {
-      return Icons.health_and_safety_outlined;
-    }
+    if (name.contains('กัวชา')) return Icons.health_and_safety_outlined;
     return Icons.accessibility_new_outlined;
   }
 }
@@ -324,7 +245,6 @@ class _BookingSheetState extends State<BookingSheet> {
   DateTime _selected = DateTime.now();
   String? _timeSlot;
   String? _staffId;
-  bool _autoStaff = false;
   String _healthcareRight = 'direct';
   bool _submitting = false;
   final _nationalIdController = TextEditingController();
@@ -348,32 +268,6 @@ class _BookingSheetState extends State<BookingSheet> {
   void dispose() {
     _nationalIdController.dispose();
     super.dispose();
-  }
-
-  Widget _staffPortrait(StaffModel person, {double size = 52}) {
-    final photo = person.photo;
-    if (photo == null || photo.isEmpty) {
-      return CircleAvatar(
-        radius: size / 2,
-        backgroundColor: const Color(0xFFE7F1EA),
-        child: Icon(Icons.person_outline,
-            color: const Color(0xFF2D8B60), size: size * 0.55),
-      );
-    }
-    return ClipOval(
-      child: Image.network(
-        photo,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => CircleAvatar(
-          radius: size / 2,
-          backgroundColor: const Color(0xFFE7F1EA),
-          child: Icon(Icons.person_outline,
-              color: const Color(0xFF2D8B60), size: size * 0.55),
-        ),
-      ),
-    );
   }
 
   Future<void> _confirm() async {
@@ -425,10 +319,9 @@ class _BookingSheetState extends State<BookingSheet> {
     setState(() => _submitting = false);
 
     if (booking != null) {
-      final navigator = Navigator.of(context);
-      navigator.pop();
+      Navigator.pop(context);
       showDialog(
-        context: navigator.context,
+        context: context,
         builder: (_) => _SuccessDialog(booking: booking),
       );
     } else {
@@ -458,52 +351,6 @@ class _BookingSheetState extends State<BookingSheet> {
                 decoration: BoxDecoration(
                     color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2))),
-          ),
-          const SizedBox(height: 18),
-
-          Row(children: [
-            IconButton(
-              tooltip: 'ย้อนกลับ',
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-            ),
-            const Expanded(
-              child: Text('จองคิวนวด',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            ),
-            IconButton(
-              tooltip: 'ประวัติการจอง',
-              onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const MyBookingsScreen())),
-              icon: const Icon(Icons.history_outlined),
-            ),
-          ]),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F5F1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(children: [
-              const Icon(Icons.spa_outlined, color: Color(0xFF2D8B60)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.service.name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15)),
-                  Text(
-                      '${widget.service.duration} นาที  •  ${widget.service.price} ฿',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF65756C))),
-                ],
-              )),
-              const Icon(Icons.edit_calendar_outlined,
-                  size: 19, color: Color(0xFF2D8B60)),
-            ]),
           ),
           const SizedBox(height: 18),
 
@@ -543,8 +390,16 @@ class _BookingSheetState extends State<BookingSheet> {
             ),
           ),
           const SizedBox(height: 4),
+          Text('จองคิว – ${widget.service.name}',
+              style: const TextStyle(
+                  fontFamily: 'Sarabun',
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  color: navy)),
+          const SizedBox(height: 18),
+
           // Calendar
-          const Text('เลือกวันที่นัดหมาย',
+          const Text('เลือกวันที่',
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -583,96 +438,30 @@ class _BookingSheetState extends State<BookingSheet> {
                 return const Text('ยังไม่มีหมอนวดที่ลงทะเบียน',
                     style: TextStyle(color: Colors.redAccent));
               }
-              final selectedStaff = booking.staff
-                  .where((person) => person.id == _staffId)
-                  .firstOrNull;
-              return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE3EAE5)),
+              return DropdownButtonFormField<String>(
+                initialValue: _staffId,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                hint: const Text('เลือกหมอนวดที่ว่าง'),
+                items: booking.staff.map((person) {
+                  final selectable = person.status == 'available';
+                  return DropdownMenuItem<String>(
+                    value: person.id,
+                    enabled: selectable,
+                    child: Row(children: [
+                      Icon(
+                        selectable ? Icons.circle : Icons.remove_circle,
+                        size: 11,
+                        color: selectable ? Colors.green : Colors.grey,
                       ),
-                      child: Row(children: [
-                        if (selectedStaff != null)
-                          _staffPortrait(selectedStaff)
-                        else
-                          const CircleAvatar(
-                            radius: 26,
-                            backgroundColor: Color(0xFFE7F1EA),
-                            child: Icon(Icons.people_outline,
-                                color: Color(0xFF2D8B60)),
-                          ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              Text(selectedStaff?.name ?? 'เลือกหมอนวด',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14)),
-                              const SizedBox(height: 3),
-                              Text(
-                                  selectedStaff?.experience.isNotEmpty == true
-                                      ? 'ประสบการณ์ ${selectedStaff!.experience} • พร้อมให้บริการ'
-                                      : 'เลือกหมอนวดที่พร้อมให้บริการ',
-                                  style: const TextStyle(
-                                      fontSize: 11, color: Color(0xFF718078))),
-                            ])),
-                        if (selectedStaff != null)
-                          const Icon(Icons.check_circle,
-                              color: Color(0xFF2D8B60), size: 20),
-                      ]),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      ChoiceChip(
-                        avatar:
-                            const Icon(Icons.auto_awesome_outlined, size: 16),
-                        label: const Text('เลือกอัตโนมัติ'),
-                        selected: _autoStaff,
-                        onSelected: booking.availableStaff.isEmpty
-                            ? null
-                            : (value) {
-                                if (!value) return;
-                                setState(() {
-                                  _staffId = booking.availableStaff.first.id;
-                                  _autoStaff = true;
-                                });
-                              },
-                      ),
-                      ...booking.staff.map((person) {
-                        final available = person.status == 'available';
-                        return ChoiceChip(
-                          avatar: person.photo != null &&
-                                  person.photo!.isNotEmpty
-                              ? CircleAvatar(
-                                  backgroundImage: NetworkImage(person.photo!))
-                              : const Icon(Icons.person_outline, size: 16),
-                          label: Text(person.name),
-                          selected: !_autoStaff && _staffId == person.id,
-                          onSelected: available
-                              ? (value) => setState(() {
-                                    _staffId = value ? person.id : null;
-                                    _autoStaff = false;
-                                  })
-                              : null,
-                        );
-                      }),
+                      const SizedBox(width: 8),
+                      Text('${person.name} (${person.statusLabel})'),
                     ]),
-                    if (booking.availableStaff.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Text('ขณะนี้ไม่มีหมอนวดว่าง',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.redAccent)),
-                      ),
-                  ]);
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => _staffId = value),
+              );
             },
           ),
           const SizedBox(height: 16),
@@ -683,18 +472,6 @@ class _BookingSheetState extends State<BookingSheet> {
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF777777))),
-          const SizedBox(height: 8),
-          const Row(children: [
-            Icon(Icons.circle, size: 8, color: Color(0xFFB5C9BC)),
-            SizedBox(width: 5),
-            Text('เลือกช่วงเวลา',
-                style: TextStyle(fontSize: 11, color: Color(0xFF718078))),
-            SizedBox(width: 14),
-            Icon(Icons.circle, size: 8, color: Color(0xFF2D8B60)),
-            SizedBox(width: 5),
-            Text('เวลาที่เลือก',
-                style: TextStyle(fontSize: 11, color: Color(0xFF718078))),
-          ]),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -755,9 +532,7 @@ class _BookingSheetState extends State<BookingSheet> {
                       children: [
                         Icon(Icons.event_available_outlined),
                         SizedBox(width: 8),
-                        Text('ยืนยันการจองคิว'),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward, size: 18),
+                        Text('ยืนยันการจอง'),
                       ],
                     ),
             ),
@@ -775,122 +550,65 @@ class _SuccessDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const sage = Color(0xFF7A9E7E);
+    const navy = Color(0xFF2D3B6B);
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: const BoxDecoration(
-                color: Color(0xFF2DAD72),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check_rounded,
-                  color: Colors.white, size: 34),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [sage, Color(0xFF5A8A5E)]),
+              borderRadius: BorderRadius.circular(36),
             ),
-            const SizedBox(height: 14),
-            const Text('จองคิวสำเร็จ!',
-                style: TextStyle(
-                    fontFamily: 'Sarabun',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF17372D))),
-            const SizedBox(height: 4),
-            const Text('บันทึกข้อมูลการนัดหมายเรียบร้อยแล้ว',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Color(0xFF718078))),
-            const SizedBox(height: 18),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F8F6),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(children: [
-                _detailRow('บริการ', booking.serviceName),
-                _detailRow('วันที่', booking.bookingDate),
-                _detailRow('เวลา', '${booking.timeSlot} น.'),
-                if (booking.staffName != null && booking.staffName!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(children: [
-                      const Expanded(
-                          child: Text('หมอนวด',
-                              style: TextStyle(
-                                  fontSize: 12, color: Color(0xFF718078)))),
-                      if (booking.staffPhoto != null &&
-                          booking.staffPhoto!.isNotEmpty)
-                        CircleAvatar(
-                            radius: 13,
-                            backgroundImage: NetworkImage(booking.staffPhoto!))
-                      else
-                        const CircleAvatar(
-                            radius: 13,
-                            backgroundColor: Color(0xFFE0ECE4),
-                            child: Icon(Icons.person_outline,
-                                size: 16, color: Color(0xFF2D8B60))),
-                      const SizedBox(width: 7),
-                      Text(booking.staffName!,
-                          style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w700)),
-                    ]),
-                  ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5F4EA),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child:
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.confirmation_number_outlined,
-                    color: Color(0xFF24764D), size: 20),
-                const SizedBox(width: 8),
-                const Text('หมายเลขคิว',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF426451))),
-                const SizedBox(width: 10),
-                Text(booking.queueNumber,
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF17633D))),
-              ]),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('ตกลง'),
+            child: const Icon(Icons.check, color: Colors.white, size: 36),
+          ),
+          const SizedBox(height: 16),
+          const Text('จองคิวสำเร็จ!',
+              style: TextStyle(
+                  fontFamily: 'Sarabun',
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: navy)),
+          const SizedBox(height: 12),
+          _row('บริการ', booking.serviceName),
+          _row('วันที่', booking.bookingDate),
+          _row('เวลา', booking.timeSlot),
+          if (booking.staffName != null && booking.staffName!.isNotEmpty)
+            _row('หมอนวด', booking.staffName!),
+          _row('หมายเลขคิว', booking.queueNumber),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle_outline),
+                  SizedBox(width: 8),
+                  Text('ตกลง'),
+                ],
               ),
             ),
-          ]),
-        ),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget _detailRow(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+  Widget _row(String label, String val) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(children: [
-          Expanded(
-              child: Text(label,
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF718078)))),
-          Text(value,
+          Text(label,
+              style: const TextStyle(color: Color(0xFF777777), fontSize: 13)),
+          const Spacer(),
+          Text(val,
               style:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
         ]),
       );
 }

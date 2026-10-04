@@ -17,38 +17,13 @@ function getBangkokNow() {
   };
 }
 
-async function getAdminBookings(query) {
-  const snap = await query.get();
-  const staffSnap = await db.collection(COLLECTIONS.STAFF).get();
-  const staffById = Object.fromEntries(staffSnap.docs.map((doc) => [doc.id, doc.data()]));
-  const userIds = [...new Set(snap.docs.map((doc) => doc.data().userId).filter(Boolean))];
-  const userEntries = await Promise.all(userIds.map(async (uid) => {
-    const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
-    return [uid, userDoc.exists ? userDoc.data() : {}];
-  }));
-  const userById = Object.fromEntries(userEntries);
-
-  return snap.docs.map((doc) => {
-    const booking = { id: doc.id, ...doc.data() };
-    const user = userById[booking.userId] || {};
-    const staff = staffById[booking.staffId] || {};
-    return {
-      ...booking,
-      customerName: booking.customerName || user.name || '',
-      customerPhone: booking.customerPhone || user.phone || '',
-      staffName: staff.name || booking.staffName || '',
-      healthcareRightLabel: booking.healthcareRightLabel || booking.healthcareRight || 'จ่ายตรง',
-      channel: booking.channel || 'app',
-    };
-  }).sort((a, b) => `${a.bookingDate} ${a.timeSlot}`.localeCompare(`${b.bookingDate} ${b.timeSlot}`));
-}
-
 // ── GET /api/bookings — รายการจองของผู้ใช้ ─────────────────
 router.get('/', verifyToken, async (req, res) => {
   try {
     const snap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('userId', '==', req.user.uid)
       .orderBy('bookingDate', 'desc')
+      .limit(20)
       .get();
 
     const bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -134,24 +109,6 @@ router.post('/', verifyToken, async (req, res) => {
     // (เดิม: เช็คซ้ำอยู่นอก try/catch ทำให้ error จาก Firestore
     //  ไม่ถูกจับ และอาจทำให้ server ค้าง/ล่มได้)
     const booking = await db.runTransaction(async (t) => {
-      if (channel !== 'walk-in') {
-        const userBookings = await t.get(
-          db.collection(COLLECTIONS.BOOKINGS)
-            .where('userId', '==', req.user.uid)
-        );
-        const activeUserBooking = userBookings.docs.find((doc) => {
-          const existing = doc.data();
-          return existing.bookingDate >= bangkokNow.date
-            && ['pending', 'confirmed', 'auto_called', 'in_service'].includes(existing.status);
-        });
-        if (activeUserBooking) {
-          throw Object.assign(
-            new Error('คุณมีคิวที่ยังใช้งานอยู่ กรุณายกเลิกคิวเดิมก่อนจองคิวใหม่'),
-            { code: 409 }
-          );
-        }
-      }
-
       const staffBookings = await t.get(
         db.collection(COLLECTIONS.BOOKINGS)
           .where('bookingDate', '==', bookingDate)
@@ -200,12 +157,11 @@ router.post('/', verifyToken, async (req, res) => {
         nationalId: normalizedNationalId || null,
         channel,
         serviceId,
-        serviceName:  ['กัวชา', 'กัวซา'].includes(service.name) ? 'กัวซา' : (service.name || ''),
+        serviceName:  service.name || '',
         servicePrice: service.price || 0,
         duration,
         staffId:      staffId || null,
         staffName:    staffDoc.data().name || '',
-        staffPhoto:   staffDoc.data().photo || null,
         bookingDate,
         timeSlot,
         queueNumber,
@@ -302,48 +258,36 @@ router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
 
 // ── GET /api/bookings/admin/today — Admin: รายการวันนี้ ─────
 router.get('/admin/today', verifyToken, requireAdmin, async (req, res) => {
-  const today = getBangkokNow().date;
+  const today = new Date().toISOString().split('T')[0];
   try {
-    const bookings = await getAdminBookings(
-      db.collection(COLLECTIONS.BOOKINGS).where('bookingDate', '==', today)
-    );
+    const snap = await db.collection(COLLECTIONS.BOOKINGS)
+      .where('bookingDate', '==', today)
+      .get();
+
+    const staffSnap = await db.collection(COLLECTIONS.STAFF).get();
+    const staffById = Object.fromEntries(staffSnap.docs.map((d) => [d.id, d.data()]));
+    const userIds = [...new Set(snap.docs.map((d) => d.data().userId).filter(Boolean))];
+    const userEntries = await Promise.all(userIds.map(async (uid) => {
+      const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
+      return [uid, userDoc.exists ? userDoc.data() : {}];
+    }));
+    const userById = Object.fromEntries(userEntries);
+    const bookings = snap.docs
+      .map(d => {
+        const booking = { id: d.id, ...d.data() };
+        const user = userById[booking.userId] || {};
+        const staff = staffById[booking.staffId] || {};
+        return {
+          ...booking,
+          customerName: booking.customerName || user.name || '',
+          customerPhone: booking.customerPhone || user.phone || '',
+          staffName: staff.name || '',
+          healthcareRightLabel: booking.healthcareRightLabel || booking.healthcareRight || 'จ่ายตรง',
+          channel: booking.channel || 'app',
+        };
+      })
+      .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
     res.json(bookings);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/admin/by-date', verifyToken, requireAdmin, async (req, res) => {
-  const date = String(req.query.date || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
-    return res.status(400).json({ error: 'รูปแบบวันที่ไม่ถูกต้อง' });
-  }
-  try {
-    const bookings = await getAdminBookings(
-      db.collection(COLLECTIONS.BOOKINGS).where('bookingDate', '==', date)
-    );
-    res.json(bookings);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-router.get('/admin/upcoming', verifyToken, requireAdmin, async (req, res) => {
-  const today = getBangkokNow().date;
-  const selectedDate = String(req.query.date || '').trim();
-
-  try {
-    let query = db.collection(COLLECTIONS.BOOKINGS);
-    if (selectedDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
-      query = query.where('bookingDate', '==', selectedDate);
-    } else {
-      query = query.where('bookingDate', '>', today);
-    }
-
-    const bookings = await getAdminBookings(query);
-    res.json(bookings.filter((booking) =>
-      booking.status !== 'cancelled' && ['pending', 'confirmed', 'auto_called'].includes(booking.status)
-    ));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

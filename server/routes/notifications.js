@@ -4,17 +4,35 @@ const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser } = require('./fcm');
 const { sendSms } = require('../services/sms');
+const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue } = require('../services/firestoreGuard');
 
 // ── GET /api/notifications — แจ้งเตือนของผู้ใช้ที่ login อยู่ ──────
 router.get('/', verifyToken, async (req, res) => {
+  const cacheKey = `notifications:${req.user.uid}`;
+  const cached = getCachedValue(cacheKey, 60_000);
+  if (cached !== undefined) {
+    return res.json(cached);
+  }
+
+  if (isQuotaPaused()) {
+    return res.json([]);
+  }
+
   try {
     const snap = await db.collection(COLLECTIONS.NOTIFICATIONS)
       .where('userId', '==', req.user.uid)
       .orderBy('createdAt', 'desc')
       .limit(50)
       .get();
-    res.json(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const notifications = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    setCachedValue(cacheKey, notifications, 60_000);
+    res.json(notifications);
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      markQuotaExceeded(err);
+      console.warn('Firestore quota exceeded while fetching notifications for user; returning empty list.');
+      return res.json([]);
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -117,6 +135,16 @@ router.post('/:id/admin-cancel', verifyToken, requireAdmin, async (req, res) => 
 // ── GET /api/notifications/admin/all — แอดมิน: ดูว่าใครยังไม่กดยืนยัน ──
 // ใช้เบอร์โทรลูกค้าโทรติดต่อเองกรณีแอปแจ้งเตือนไม่ถึง (ตามที่ระบุในสเปค)
 router.get('/admin/all', verifyToken, requireAdmin, async (req, res) => {
+  const cacheKey = 'notifications:admin';
+  const cached = getCachedValue(cacheKey, 120_000);
+  if (cached !== undefined) {
+    return res.json(cached);
+  }
+
+  if (isQuotaPaused()) {
+    return res.json([]);
+  }
+
   try {
     const snap = await db.collection(COLLECTIONS.NOTIFICATIONS)
       .orderBy('createdAt', 'desc')
@@ -149,14 +177,21 @@ router.get('/admin/all', verifyToken, requireAdmin, async (req, res) => {
       if (doc.exists) bookingById[bookingId] = doc.data();
     }));
 
-    res.json(notifications.map((n) => ({
+    const result = notifications.map((n) => ({
       ...n,
       customerName:  bookingById[n.bookingId]?.customerName || userById[n.userId]?.name || '',
       customerPhone: bookingById[n.bookingId]?.customerPhone || userById[n.userId]?.phone || '',
       queueNumber:   bookingById[n.bookingId]?.queueNumber || '',
       bookingStatus: bookingById[n.bookingId]?.status || '',
-    })));
+    }));
+    setCachedValue(cacheKey, result, 120_000);
+    res.json(result);
   } catch (err) {
+    if (isQuotaExceededError(err)) {
+      markQuotaExceeded(err);
+      console.warn('Firestore quota exceeded while fetching admin notifications; returning empty list.');
+      return res.json([]);
+    }
     res.status(500).json({ error: err.message });
   }
 });

@@ -178,17 +178,6 @@ body {
 .quick-btn:hover { background: var(--jade-pale); border-color: rgba(46,125,82,0.3); }
 .quick-btn:active { transform: scale(0.98); }
 
-.queue-filter {
-  border: 1px solid var(--border); background: var(--mist); color: var(--forest);
-  border-radius: 999px; padding: 7px 12px; font-family: inherit; font-size: 12px;
-  font-weight: 600; cursor: pointer; transition: all 0.15s ease;
-}
-.queue-filter:hover { border-color: rgba(46,125,82,0.4); }
-.queue-filter.active {
-  background: var(--jade); border-color: var(--jade); color: #fff;
-  box-shadow: 0 4px 10px rgba(46,125,82,0.2);
-}
-
 /* ── TABLE ── */
 .table-wrap { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 table { min-width: 760px; }
@@ -231,8 +220,6 @@ tbody tr:hover td { background: var(--jade-pale); }
 .form-group input:focus, .form-group select:focus {
   border-color: var(--jade); background: var(--white); box-shadow: 0 0 0 3px rgba(46,125,82,0.1);
 }
-#dashboard-date { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--forest); background: var(--mist); font: inherit; }
-#dashboard-date:focus { outline: 2px solid rgba(46,125,82,0.25); border-color: var(--jade); }
 .btn-primary {
   background: var(--jade); color: #fff; border: none; border-radius: var(--radius-sm);
   padding: 10px 22px; font-family: inherit; font-size: 14px; font-weight: 600;
@@ -470,20 +457,6 @@ tbody tr:hover td { background: var(--jade-pale); }
           </div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px">
-        <div class="card-header">
-          <div>
-            <h4>รายชื่อการจองประจำวัน</h4>
-            <small style="color:var(--slate)">แสดงรายการคิวของวันนี้</small>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>คิว</th><th>เวลา</th><th>ลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สิทธิ</th><th>สถานะ</th></tr></thead>
-            <tbody id="dashboard-day-tbody"></tbody>
-          </table>
-        </div>
-      </div>
     </section>
 
     <!-- BOOKINGS -->
@@ -549,32 +522,10 @@ tbody tr:hover td { background: var(--jade-pale); }
             <h4>คิวที่รออยู่</h4>
             <span class="badge badge-yellow" id="queue-list-count">0 คิว</span>
           </div>
-          <div class="queue-filter-row" style="display:flex;flex-wrap:wrap;gap:8px;padding:12px 0 8px">
-            <button class="queue-filter active" data-queue-filter="all" type="button">ทั้งหมด</button>
-            <button class="queue-filter" data-queue-filter="pending" type="button">รอยืนยัน</button>
-            <button class="queue-filter" data-queue-filter="confirmed" type="button">ยืนยันแล้ว</button>
-            <button class="queue-filter" data-queue-filter="auto_called" type="button">เรียกอัตโนมัติ</button>
-            <button class="queue-filter" data-queue-filter="in_service" type="button">กำลังให้บริการ</button>
-          </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>คิว</th><th>เวลาจอง</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
               <tbody id="queue-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card" style="grid-column:1/-1">
-          <div class="card-header">
-            <h4>รายการจองล่วงหน้าทั้งหมด</h4>
-            <div style="display:flex;align-items:center;gap:10px">
-              <input type="date" id="upcoming-date" aria-label="เลือกวันที่รายการจองล่วงหน้า">
-              <span class="badge badge-blue" id="upcoming-booking-count">0 รายการ</span>
-            </div>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>วันที่</th><th>คิว</th><th>เวลา</th><th>ลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สิทธิ</th><th>สถานะ</th></tr></thead>
-              <tbody id="upcoming-bookings-tbody"></tbody>
             </table>
           </div>
         </div>
