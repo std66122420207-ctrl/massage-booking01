@@ -168,6 +168,22 @@ class UserModel {
       needsPhone: m['needsPhone'] ?? (m['phone'] == null),
     );
   }
+
+  UserModel copyWith({
+    String? uid,
+    String? name,
+    String? phone,
+    String? loginMethod,
+    bool? needsPhone,
+  }) {
+    return UserModel(
+      uid: uid ?? this.uid,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      loginMethod: loginMethod ?? this.loginMethod,
+      needsPhone: needsPhone ?? this.needsPhone,
+    );
+  }
 }
 
 // ── models/notification_model.dart ─────────────────────────
