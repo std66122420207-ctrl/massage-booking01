@@ -10,17 +10,46 @@ const {
 } = require('./firestoreGuard');
 const { getBangkokDate } = require('./bookingPolicy');
 
-const AUTO_CALL_LEAD_MINUTES = 15;
+const APPOINTMENT_REMINDERS = [
+  { minutes: 60, nextReminderMinutes: 30, field: 'appointmentReminder60SentAt' },
+  { minutes: 30, nextReminderMinutes: 15, field: 'appointmentReminder30SentAt' },
+  { minutes: 15, nextReminderMinutes: 0, field: 'appointmentReminder15SentAt' },
+];
 const NO_SHOW_GRACE_MINUTES = 5;
-const ACTIVE_STATUSES = ['pending', 'confirmed'];
+const ACTIVE_STATUSES = ['pending', 'confirmed', 'auto_called'];
 const AUTO_START_READY_STATUSES = ['pending', 'confirmed', 'auto_called'];
 
 function getToday(now = new Date()) {
   return getBangkokDate(now);
 }
 
+function getNextDate(date) {
+  const next = new Date(`${date}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
 function appointmentDate(booking) {
-  return new Date(`${booking.bookingDate}T${booking.timeSlot}:00+07:00`);
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(booking.bookingDate || ''));
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(String(booking.timeSlot || ''));
+  if (!dateMatch || !timeMatch) return new Date(Number.NaN);
+
+  const [, year, month, day] = dateMatch;
+  const [, hour, minute] = timeMatch;
+  const parts = [Number(year), Number(month), Number(day), Number(hour), Number(minute)];
+  const [yearNumber, monthNumber, dayNumber, hourNumber, minuteNumber] = parts;
+  const utc = Date.UTC(yearNumber, monthNumber - 1, dayNumber, hourNumber, minuteNumber);
+  const localDate = new Date(utc);
+  if (
+    localDate.getUTCFullYear() !== yearNumber
+    || localDate.getUTCMonth() !== monthNumber - 1
+    || localDate.getUTCDate() !== dayNumber
+    || hourNumber > 23
+    || minuteNumber > 59
+  ) {
+    return new Date(Number.NaN);
+  }
+  return new Date(utc - 7 * 60 * 60 * 1000);
 }
 
 function timestampDate(value) {
@@ -42,10 +71,21 @@ function isNoShowDue(booking, now = new Date()) {
   const appointment = appointmentDate(booking);
   return AUTO_START_READY_STATUSES.includes(booking.status)
     && booking.channel !== 'walk-in'
-    && Boolean(timestampDate(booking.autoConfirmedAt))
     && !timestampDate(booking.customerConfirmedAt)
     && Number.isFinite(appointment.getTime())
     && now >= new Date(appointment.getTime() + NO_SHOW_GRACE_MINUTES * 60 * 1000);
+}
+
+function dueAppointmentReminder(booking, now = new Date()) {
+  if (!ACTIVE_STATUSES.includes(booking.status) || booking.channel === 'walk-in') return null;
+  const appointment = appointmentDate(booking);
+  if (!Number.isFinite(appointment.getTime())) return null;
+  const minutesUntilAppointment = (appointment.getTime() - now.getTime()) / 60_000;
+  return APPOINTMENT_REMINDERS.find((reminder) => (
+    minutesUntilAppointment <= reminder.minutes
+    && minutesUntilAppointment > reminder.nextReminderMinutes
+    && !timestampDate(booking[reminder.field])
+  )) || null;
 }
 
 function isServiceCompleteDue(booking, now = new Date()) {
@@ -123,8 +163,9 @@ async function autoStartDueBookings(now = new Date(), snapshot = null) {
     if (isNoShowDue(booking, now)) {
       const updated = await db.runTransaction(async (transaction) => {
         const current = await transaction.get(doc.ref);
+        if (!current.exists) return false;
         const latest = current.data();
-        if (!current.exists || !isNoShowDue(latest, now)) return false;
+        if (!isNoShowDue(latest, now)) return false;
         transaction.update(doc.ref, {
           status: 'cancelled',
           cancellationReason: 'no_show',
@@ -149,8 +190,9 @@ async function autoStartDueBookings(now = new Date(), snapshot = null) {
       if (!booking.autoConfirmedAt) {
         const confirmed = await db.runTransaction(async (transaction) => {
           const current = await transaction.get(doc.ref);
+          if (!current.exists) return false;
           const latest = current.data();
-          if (!current.exists || latest.autoConfirmedAt || !AUTO_START_READY_STATUSES.includes(latest.status)) {
+          if (latest.autoConfirmedAt || !AUTO_START_READY_STATUSES.includes(latest.status)) {
             return false;
           }
           transaction.update(doc.ref, {
@@ -175,8 +217,9 @@ async function autoStartDueBookings(now = new Date(), snapshot = null) {
 
     const updated = await db.runTransaction(async (transaction) => {
       const current = await transaction.get(doc.ref);
+      if (!current.exists) return false;
       const latest = current.data();
-      if (!current.exists || !isReadyToAutoStart(latest, now)) {
+      if (!isReadyToAutoStart(latest, now)) {
         return false;
       }
 
@@ -207,11 +250,10 @@ async function autoStartDueBookings(now = new Date(), snapshot = null) {
 }
 
 async function autoCompleteDueBookings(now = new Date(), snapshot = null) {
-  const today = getToday(now);
   let snap;
   try {
     snap = snapshot || await db.collection(COLLECTIONS.BOOKINGS)
-      .where('bookingDate', '==', today)
+      .where('status', '==', 'in_service')
       .get();
   } catch (error) {
     if (isQuotaExceededError(error)) {
@@ -229,10 +271,12 @@ async function autoCompleteDueBookings(now = new Date(), snapshot = null) {
 
     const updated = await db.runTransaction(async (transaction) => {
       const current = await transaction.get(doc.ref);
+      if (!current.exists) return false;
       const latest = current.data();
-      if (!current.exists || !isServiceCompleteDue(latest, now)) return false;
+      if (!isServiceCompleteDue(latest, now)) return false;
 
-      const queueRef = db.collection('queue_status').doc(today);
+      const queueDate = latest.bookingDate || getToday(now);
+      const queueRef = db.collection('queue_status').doc(queueDate);
       const queueDoc = await transaction.get(queueRef);
       transaction.update(doc.ref, {
         status: 'done',
@@ -265,79 +309,82 @@ async function autoCompleteDueBookings(now = new Date(), snapshot = null) {
   return { checked: snap.size, completed };
 }
 
-async function autoCallUpcomingBookings(now = new Date(), snapshot = null) {
+async function sendAppointmentReminders(now = new Date(), snapshot = null) {
   const today = getToday(now);
+  const tomorrow = getNextDate(today);
   let snap;
   try {
     snap = snapshot || await db.collection(COLLECTIONS.BOOKINGS)
-      .where('bookingDate', '==', today)
+      .where('bookingDate', '>=', today)
+      .where('bookingDate', '<=', tomorrow)
       .get();
   } catch (error) {
     if (isQuotaExceededError(error)) {
       markQuotaExceeded(error);
-      console.warn('Firestore quota exceeded while auto-calling bookings; skipping cycle.');
-      return { checked: 0, called: 0, quotaExceeded: true };
+      console.warn('Firestore quota exceeded while sending appointment reminders; skipping cycle.');
+      return { checked: 0, sent: 0, quotaExceeded: true };
     }
     throw error;
   }
-  const due = snap.docs.filter((doc) => {
-    const booking = doc.data();
-    if (!ACTIVE_STATUSES.includes(booking.status)) return false;
-    if (booking.channel === 'walk-in' || booking.autoCalledAt) return false;
-    const appointment = appointmentDate(booking);
-    const notifyAt = new Date(appointment.getTime() - AUTO_CALL_LEAD_MINUTES * 60 * 1000);
-    return now >= notifyAt && now < appointment;
-  });
 
-  let called = 0;
-  for (const doc of due) {
-    const booking = doc.data();
-    const updated = await db.runTransaction(async (transaction) => {
+  let sent = 0;
+  for (const doc of snap.docs) {
+    if (!dueAppointmentReminder(doc.data(), now)) continue;
+    const reminder = await db.runTransaction(async (transaction) => {
       const current = await transaction.get(doc.ref);
+      if (!current.exists) return null;
       const latest = current.data();
-      if (!current.exists || !ACTIVE_STATUSES.includes(latest.status) || latest.autoCalledAt) {
-        return false;
-      }
+      const due = dueAppointmentReminder(latest, now);
+      if (!due) return null;
       transaction.update(doc.ref, {
-        status: 'auto_called',
-        autoCalledAt: admin.firestore.FieldValue.serverTimestamp(),
+        [due.field]: admin.firestore.FieldValue.serverTimestamp(),
       });
-      transaction.set(db.collection('queue_status').doc(today), {
-        lastAutoCalledQueue: latest.queueNumber,
-        lastAutoCalledBookingId: doc.id,
-        lastAutoCalledAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-      return true;
+      return { booking: latest, due };
     });
 
-    if (!updated) continue;
-    called += 1;
-    const message = `ใกล้ถึงเวลานัดของคุณแล้ว 15 นาที เลขคิว ${booking.queueNumber} กรุณาเปิดแอปและกดยืนยันเมื่อมาถึงศูนย์บริการ`;
-    await deliverAutoNotification({ ...booking, id: doc.id }, message, 'ใกล้ถึงเวลานัด', 'auto_call');
+    if (!reminder) continue;
+    sent += 1;
+    const { booking } = reminder;
+    const lead = reminder.due.minutes === 60 ? '1 ชั่วโมง' : `${reminder.due.minutes} นาที`;
+    const message = `แจ้งเตือน: อีก ${lead} จะถึงเวลานัดของคุณ เลขคิว ${booking.queueNumber} (${booking.timeSlot} น.)`;
+    await deliverAutoNotification(
+      { ...booking, id: doc.id },
+      message,
+      `เตือนเวลานัดล่วงหน้า ${lead}`,
+      `appointment_reminder_${reminder.due.minutes}m`,
+    );
   }
-  return { checked: snap.size, called };
+  return { checked: snap.size, sent };
 }
 
 async function runAutoCallCycle(now = new Date()) {
   const today = getToday(now);
+  const tomorrow = getNextDate(today);
   let snapshot;
   try {
     snapshot = await db.collection(COLLECTIONS.BOOKINGS)
-      .where('bookingDate', '==', today)
+      .where('bookingDate', '>=', today)
+      .where('bookingDate', '<=', tomorrow)
       .get();
   } catch (error) {
     if (isQuotaExceededError(error)) {
       markQuotaExceeded(error);
-      console.warn('Firestore quota exceeded for auto-call cycle; pausing cycle until quota resets.');
-      return { checked: 0, quotaExceeded: true, autoCall: { checked: 0, called: 0, quotaExceeded: true }, autoStart: { checked: 0, started: 0, quotaExceeded: true } };
+      console.warn('Firestore quota exceeded for appointment automation; pausing cycle until quota resets.');
+      return {
+        checked: 0,
+        quotaExceeded: true,
+        reminders: { checked: 0, sent: 0, quotaExceeded: true },
+        autoStart: { checked: 0, started: 0, quotaExceeded: true },
+        autoComplete: { checked: 0, completed: 0, quotaExceeded: true },
+      };
     }
     throw error;
   }
 
-  const autoCall = await autoCallUpcomingBookings(now, snapshot);
+  const reminders = await sendAppointmentReminders(now, snapshot);
   const autoStart = await autoStartDueBookings(now, snapshot);
-  const autoComplete = await autoCompleteDueBookings(now, snapshot);
-  return { checked: snapshot.size, autoCall, autoStart, autoComplete };
+  const autoComplete = await autoCompleteDueBookings(now);
+  return { checked: snapshot.size, reminders, autoStart, autoComplete };
 }
 
 function startAutoCallWorker() {
@@ -358,13 +405,14 @@ function startAutoCallWorker() {
 }
 
 module.exports = {
-  autoCallUpcomingBookings,
+  sendAppointmentReminders,
   autoStartDueBookings,
   autoCompleteDueBookings,
   runAutoCallCycle,
   startAutoCallWorker,
   getToday,
   appointmentDate,
+  dueAppointmentReminder,
   isReadyToAutoStart,
   isNoShowDue,
   isServiceCompleteDue,

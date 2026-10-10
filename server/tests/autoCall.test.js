@@ -1,10 +1,11 @@
 const assert = require('assert');
 const {
-	autoCallUpcomingBookings,
+	sendAppointmentReminders,
 	autoStartDueBookings,
 	runAutoCallCycle,
 	getToday,
 	appointmentDate,
+	dueAppointmentReminder,
 	isReadyToAutoStart,
 	isNoShowDue,
 	isServiceCompleteDue,
@@ -18,7 +19,7 @@ const {
 	getBangkokDate,
 } = require('../services/bookingPolicy');
 
-assert.strictEqual(typeof autoCallUpcomingBookings, 'function');
+assert.strictEqual(typeof sendAppointmentReminders, 'function');
 assert.strictEqual(typeof autoStartDueBookings, 'function');
 assert.strictEqual(typeof runAutoCallCycle, 'function');
 assert.strictEqual(typeof isQuotaExceededError, 'function');
@@ -31,6 +32,37 @@ assert.strictEqual(
 	appointmentDate({ bookingDate: '2026-10-04', timeSlot: '10:00' }).toISOString(),
 	'2026-10-04T03:00:00.000Z',
 );
+assert.strictEqual(Number.isNaN(appointmentDate({
+	bookingDate: '2026-02-30',
+	timeSlot: '10:00',
+}).getTime()), true);
+const reminderBooking = {
+	bookingDate: '2026-10-04',
+	timeSlot: '10:00',
+	status: 'pending',
+	channel: 'app',
+};
+assert.strictEqual(
+	dueAppointmentReminder(reminderBooking, new Date('2026-10-04T02:00:00.000Z')).minutes,
+	60,
+);
+assert.strictEqual(
+	dueAppointmentReminder(reminderBooking, new Date('2026-10-04T02:30:00.000Z')).minutes,
+	30,
+);
+assert.strictEqual(
+	dueAppointmentReminder(reminderBooking, new Date('2026-10-04T02:45:00.000Z')).minutes,
+	15,
+);
+assert.strictEqual(dueAppointmentReminder(reminderBooking, new Date('2026-10-04T03:00:00.000Z')), null);
+assert.strictEqual(dueAppointmentReminder({
+	...reminderBooking,
+	appointmentReminder60SentAt: new Date('2026-10-04T02:00:00.000Z'),
+}, new Date('2026-10-04T02:01:00.000Z')), null);
+assert.strictEqual(dueAppointmentReminder({
+	...reminderBooking,
+	channel: 'walk-in',
+}, new Date('2026-10-04T02:00:00.000Z')), null);
 const appointment = { bookingDate: '2026-10-04', timeSlot: '10:00', status: 'auto_called' };
 assert.strictEqual(isReadyToAutoStart(appointment, new Date('2026-10-04T02:59:00.000Z')), false);
 assert.strictEqual(isReadyToAutoStart({
@@ -40,7 +72,11 @@ assert.strictEqual(isReadyToAutoStart({
 assert.strictEqual(isReadyToAutoStart({ ...appointment, status: 'cancelled' }, new Date('2026-10-04T04:00:00.000Z')), false);
 assert.strictEqual(isReadyToAutoStart({ ...appointment, autoStartedAt: new Date() }, new Date('2026-10-04T04:00:00.000Z')), false);
 assert.strictEqual(isNoShowDue(appointment, new Date('2026-10-04T03:04:59.000Z')), false);
-assert.strictEqual(isNoShowDue(appointment, new Date('2026-10-04T03:06:00.000Z')), false);
+assert.strictEqual(isNoShowDue(appointment, new Date('2026-10-04T03:05:00.000Z')), true);
+assert.strictEqual(isNoShowDue({
+	...appointment,
+	status: 'confirmed',
+}, new Date('2026-10-04T03:05:00.000Z')), true);
 const autoConfirmedAppointment = {
 	...appointment,
 	autoConfirmedAt: new Date('2026-10-04T03:00:00.000Z'),
@@ -64,6 +100,16 @@ assert.strictEqual(isServiceCompleteDue({
 	serviceStartedAt: new Date('2026-10-04T03:00:00.000Z'),
 	duration: 60,
 }, new Date('2026-10-04T04:00:00.000Z')), true);
+assert.strictEqual(isServiceCompleteDue({
+	status: 'in_service',
+	serviceStartedAt: new Date('2026-10-04T03:00:00.000Z'),
+	duration: 45,
+}, new Date('2026-10-04T03:44:59.000Z')), false);
+assert.strictEqual(isServiceCompleteDue({
+	status: 'in_service',
+	serviceStartedAt: new Date('2026-10-04T03:00:00.000Z'),
+	duration: 45,
+}, new Date('2026-10-04T03:45:00.000Z')), true);
 
 const priorBookings = [
 	{ nationalId: '1-2345-67890-12-3', healthcareRight: 'universal', status: 'done' },

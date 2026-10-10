@@ -6,9 +6,10 @@ DateTime? _parseFirestoreTimestamp(dynamic value) {
   if (value == null) return null;
   if (value is Map && value['_seconds'] != null) {
     return DateTime.fromMillisecondsSinceEpoch(
-        (value['_seconds'] as int) * 1000);
+        (value['_seconds'] as int) * 1000,
+        isUtc: true);
   }
-  if (value is String) return DateTime.tryParse(value);
+  if (value is String) return DateTime.tryParse(value)?.toUtc();
   return null;
 }
 

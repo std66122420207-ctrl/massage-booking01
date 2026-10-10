@@ -625,7 +625,7 @@ function renderNotifications(list) {
         <td>${n.message || '-'}</td>
         <td>${n.customerName || '-'}${n.queueNumber ? `<br><small class="queue-id">${n.queueNumber}</small>` : ''}</td>
         <td>${n.customerPhone || '-'}</td>
-        <td>${n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH') : '-'}</td>
+        <td>${n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : '-'}</td>
         <td><span class="badge ${statusClass}">${statusLabel}</span></td>
         <td>
           ${!n.confirmed && !closed

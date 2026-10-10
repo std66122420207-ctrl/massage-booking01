@@ -60,7 +60,7 @@ router.post('/:id/confirm', verifyToken, async (req, res) => {
         if (
           booking.status === 'cancelled' ||
           !Number.isFinite(appointment.getTime()) ||
-          Date.now() > graceEndsAt
+          Date.now() >= graceEndsAt
         ) {
           return { status: 409, error: 'หมดเวลายืนยันการมาถึงแล้ว' };
         }

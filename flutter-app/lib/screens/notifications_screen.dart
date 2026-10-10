@@ -91,7 +91,8 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final time = notification.createdAt != null
-        ? DateFormat('d MMM HH:mm', 'th').format(notification.createdAt!)
+        ? DateFormat('d MMM HH:mm', 'th').format(
+            notification.createdAt!.toUtc().add(const Duration(hours: 7)))
         : '';
     return Container(
       padding: const EdgeInsets.all(16),
