@@ -4,30 +4,49 @@ const router  = express.Router();
 const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
-const AVAILABLE_SERVICE_NAMES = new Set([
+const AVAILABLE_SERVICE_NAMES = [
   'ประคบหินร้อน',
   'นวดเท้า',
   'นวดตัว',
   'กัวชา',
-  'กัวซา',
-]);
+];
+
+const NORMALIZED_SERVICE_NAME = {
+  กัวซา: 'กัวชา',
+};
+
+function normalizeServiceName(name) {
+  if (typeof name !== 'string') return '';
+  const trimmed = name.trim();
+  return NORMALIZED_SERVICE_NAME[trimmed] || trimmed;
+}
 
 // GET /api/services — รายการบริการทั้งหมด
 router.get('/', async (req, res) => {
   try {
-    const snap     = await db.collection(COLLECTIONS.SERVICES).orderBy('order').get();
+    const snap = await db.collection(COLLECTIONS.SERVICES).orderBy('order').get();
     const filtered = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(service => service.active !== false && AVAILABLE_SERVICE_NAMES.has(service.name))
-      .map(service => service.name === 'กัวชา'
-        ? { ...service, name: 'กัวซา', description: 'ดูแลผิวและลดความตึงด้วยศาสตร์กัวซา' }
-        : service);
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .map((service) => ({
+        ...service,
+        name: normalizeServiceName(service.name),
+        order: Number(service.order) || 99,
+      }))
+      .filter((service) => service.active !== false)
+      .filter((service) => AVAILABLE_SERVICE_NAMES.includes(service.name))
+      .sort((a, b) => {
+        const orderDiff = (a.order || 99) - (b.order || 99);
+        if (orderDiff !== 0) return orderDiff;
+        return AVAILABLE_SERVICE_NAMES.indexOf(a.name) - AVAILABLE_SERVICE_NAMES.indexOf(b.name);
+      });
+
     const seenNames = new Set();
     const services = filtered.filter((service) => {
       if (seenNames.has(service.name)) return false;
       seenNames.add(service.name);
       return true;
     });
+
     res.json(services);
   } catch (err) {
     res.status(500).json({ error: err.message });

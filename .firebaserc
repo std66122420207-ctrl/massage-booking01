@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "massage-booking-ce032"
+  },
+  "targets": {
+    "massage-booking-ce032": {
+      "hosting": {
+        "admin": ["massage-booking-ce032"],
+        "customer": ["massage-booking-customer"]
+      }
+    }
+  }
+}

@@ -3,8 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 
 // ══ Phone Required Screen ══════════════════════════════════════
-// แสดงหลัง login ผ่าน ThaiD ถ้ายังไม่มีเบอร์โทรในระบบ — เก็บไว้เป็นเบอร์สำรอง
-// ให้แอดมินโทรติดต่อได้เองกรณีแอปแจ้งเตือนไม่ถึง (ตามสเปคที่กำหนด)
+// Collects a contact number for existing accounts that do not have one.
 class PhoneRequiredScreen extends StatefulWidget {
   const PhoneRequiredScreen({super.key});
   @override

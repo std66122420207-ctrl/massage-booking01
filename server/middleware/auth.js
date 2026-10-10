@@ -20,7 +20,8 @@ async function verifyToken(req, res, next) {
 
 // ── Admin-only middleware ───────────────────────────────────
 function requireAdmin(req, res, next) {
-  if (!req.user?.admin) {
+  const isAdmin = Boolean(req.user?.admin ?? req.user?.claims?.admin ?? false);
+  if (!isAdmin) {
     return res.status(403).json({ error: 'สิทธิ์ไม่เพียงพอ' });
   }
   next();

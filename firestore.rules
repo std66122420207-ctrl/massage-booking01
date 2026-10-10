@@ -2,20 +2,30 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Users: อ่าน/แก้ไขข้อมูลตัวเองได้เท่านั้น ──
+    // ── Users: ผู้ใช้จัดการโปรไฟล์ตัวเองได้ แต่เปลี่ยน role ไม่ได้ ──
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow read: if request.auth.token.admin == true;
+      allow read: if request.auth != null &&
+                    (request.auth.uid == userId || request.auth.token.admin == true);
+      allow create: if request.auth != null &&
+                      request.auth.uid == userId &&
+                      request.resource.data.uid == userId &&
+                      request.resource.data.role == 'user';
+      allow update: if request.auth != null &&
+                      ((request.auth.uid == userId &&
+                        request.resource.data.uid == resource.data.uid &&
+                        request.resource.data.role == resource.data.role &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['name', 'citizenId', 'email', 'phone', 'updatedAt'])) ||
+                       request.auth.token.admin == true);
+      allow delete: if request.auth != null && request.auth.token.admin == true;
     }
 
     // ── Bookings: ผู้ใช้จัดการของตัวเอง / admin จัดการทั้งหมด ──
     match /bookings/{bookingId} {
       allow read:   if request.auth != null &&
                       (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null &&
-                      (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
-      allow delete: if request.auth.token.admin == true;
+      // Booking mutations must go through the API so policy checks cannot be bypassed.
+      allow create, update, delete: if false;
     }
 
     // ── Services / Staff: อ่านได้ทุกคน, แก้ไขได้เฉพาะ admin ──

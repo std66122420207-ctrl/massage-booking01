@@ -8,7 +8,27 @@ const admin = require('firebase-admin');
 if (!admin.apps.length) {
   const clientEmail = (process.env.FIREBASE_CLIENT_EMAIL || '').trim();
   const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').trim();
-  const projectId = (process.env.FIREBASE_PROJECT_ID || '').trim();
+  let firebaseConfig = {};
+  try {
+    firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG || '{}');
+  } catch {
+    console.warn('FIREBASE_CONFIG is not valid JSON; using individual Firebase environment variables.');
+  }
+  const projectId = (
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.GCLOUD_PROJECT ||
+    process.env.GCP_PROJECT ||
+    firebaseConfig.projectId ||
+    ''
+  ).trim();
+  const storageBucket =
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    firebaseConfig.storageBucket ||
+    (projectId ? `${projectId}.firebasestorage.app` : undefined);
+  const firebaseOptions = {
+    ...(projectId ? { projectId } : {}),
+    ...(storageBucket ? { storageBucket } : {}),
+  };
   const hasServiceAccount = Boolean(
     clientEmail &&
     privateKey &&
@@ -17,6 +37,7 @@ if (!admin.apps.length) {
 
   if (hasServiceAccount) {
     admin.initializeApp({
+      ...firebaseOptions,
       credential: admin.credential.cert({
         projectId,
         clientEmail,
@@ -24,7 +45,10 @@ if (!admin.apps.length) {
       }),
     });
   } else {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    admin.initializeApp({
+      ...firebaseOptions,
+      credential: admin.credential.applicationDefault(),
+    });
   }
 }
 

@@ -2,28 +2,63 @@ const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { createNotification } = require('../routes/notifications');
 const { sendPushToUser } = require('../routes/fcm');
 const { sendSms } = require('./sms');
-const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused } = require('./firestoreGuard');
+const {
+  isQuotaExceededError,
+  markQuotaExceeded,
+  isQuotaPaused,
+  deleteCachedValue,
+} = require('./firestoreGuard');
+const { getBangkokDate } = require('./bookingPolicy');
 
 const AUTO_CALL_LEAD_MINUTES = 15;
+const NO_SHOW_GRACE_MINUTES = 5;
 const ACTIVE_STATUSES = ['pending', 'confirmed'];
-const AUTO_CONFIRM_READY_STATUSES = ['pending', 'confirmed', 'auto_called'];
+const AUTO_START_READY_STATUSES = ['pending', 'confirmed', 'auto_called'];
 
 function getToday(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Bangkok',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(now);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  return getBangkokDate(now);
 }
 
 function appointmentDate(booking) {
   return new Date(`${booking.bookingDate}T${booking.timeSlot}:00+07:00`);
 }
 
+function timestampDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function isReadyToAutoStart(booking, now = new Date()) {
+  return AUTO_START_READY_STATUSES.includes(booking.status)
+    && !booking.autoStartedAt
+    && (booking.channel === 'walk-in' || Boolean(timestampDate(booking.customerConfirmedAt)))
+    && Number.isFinite(appointmentDate(booking).getTime())
+    && now >= appointmentDate(booking);
+}
+
+function isNoShowDue(booking, now = new Date()) {
+  const appointment = appointmentDate(booking);
+  return AUTO_START_READY_STATUSES.includes(booking.status)
+    && booking.channel !== 'walk-in'
+    && Boolean(timestampDate(booking.autoConfirmedAt))
+    && !timestampDate(booking.customerConfirmedAt)
+    && Number.isFinite(appointment.getTime())
+    && now >= new Date(appointment.getTime() + NO_SHOW_GRACE_MINUTES * 60 * 1000);
+}
+
+function isServiceCompleteDue(booking, now = new Date()) {
+  const startedAt = timestampDate(booking.serviceStartedAt || booking.calledAt);
+  const duration = Number(booking.duration) || 60;
+  return booking.status === 'in_service'
+    && Boolean(startedAt)
+    && now >= new Date(startedAt.getTime() + duration * 60 * 1000);
+}
+
 async function deliverAutoNotification(booking, message, title, type) {
   const deliveries = await Promise.allSettled([
-    createNotification({ userId: booking.userId, bookingId: booking.id, message }),
+    createNotification({ userId: booking.userId, bookingId: booking.id, message, type }),
     sendPushToUser(booking.userId, title, message, {
       bookingId: booking.id,
       queueNumber: String(booking.queueNumber || ''),
@@ -39,7 +74,27 @@ async function deliverAutoNotification(booking, message, title, type) {
   }
 }
 
-async function autoConfirmDueBookings(now = new Date(), snapshot = null) {
+async function resolveBookingNotifications(bookingId, action) {
+  const snap = await db.collection(COLLECTIONS.NOTIFICATIONS)
+    .where('bookingId', '==', bookingId)
+    .get();
+  if (snap.empty) return;
+
+  const batch = db.batch();
+  for (const doc of snap.docs) {
+    batch.update(doc.ref, {
+      resolvedAction: action,
+      resolvedBySystem: true,
+      resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+  await batch.commit();
+  const userIds = [...new Set(snap.docs.map((doc) => doc.data().userId).filter(Boolean))];
+  for (const userId of userIds) deleteCachedValue(`notifications:${userId}`);
+  deleteCachedValue('notifications:admin');
+}
+
+async function autoStartDueBookings(now = new Date(), snapshot = null) {
   const today = getToday(now);
   let snap;
   try {
@@ -49,50 +104,165 @@ async function autoConfirmDueBookings(now = new Date(), snapshot = null) {
   } catch (error) {
     if (isQuotaExceededError(error)) {
       markQuotaExceeded(error);
-      console.warn('Firestore quota exceeded while auto-confirming bookings; skipping cycle.');
-      return { checked: 0, confirmed: 0, quotaExceeded: true };
+      console.warn('Firestore quota exceeded while auto-starting bookings; skipping cycle.');
+      return { checked: 0, started: 0, quotaExceeded: true };
     }
     throw error;
   }
 
-  let confirmed = 0;
+  let started = 0;
+  let autoConfirmed = 0;
+  let cancelled = 0;
 
   for (const doc of snap.docs) {
     const booking = doc.data();
-    if (!AUTO_CONFIRM_READY_STATUSES.includes(booking.status)) continue;
-    if (booking.status === 'in_service' || booking.status === 'done' || booking.status === 'cancelled') continue;
-    if (booking.autoConfirmedAt) continue;
-
+    if (!AUTO_START_READY_STATUSES.includes(booking.status)) continue;
     const appointment = appointmentDate(booking);
-    if (now < appointment) continue;
+    if (!Number.isFinite(appointment.getTime()) || now < appointment) continue;
+
+    if (isNoShowDue(booking, now)) {
+      const updated = await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(doc.ref);
+        const latest = current.data();
+        if (!current.exists || !isNoShowDue(latest, now)) return false;
+        transaction.update(doc.ref, {
+          status: 'cancelled',
+          cancellationReason: 'no_show',
+          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+      if (!updated) continue;
+      cancelled += 1;
+      await resolveBookingNotifications(doc.id, 'cancelled');
+      await deliverAutoNotification(
+        { ...booking, id: doc.id },
+        `ยกเลิกคิว ${booking.queueNumber} อัตโนมัติ เนื่องจากไม่ได้ยืนยันภายใน 5 นาทีหลังเวลานัด`,
+        'ยกเลิกคิวอัตโนมัติ',
+        'no_show_cancelled',
+      );
+      continue;
+    }
+
+    if (booking.channel !== 'walk-in' && !timestampDate(booking.customerConfirmedAt)) {
+      if (!booking.autoConfirmedAt) {
+        const confirmed = await db.runTransaction(async (transaction) => {
+          const current = await transaction.get(doc.ref);
+          const latest = current.data();
+          if (!current.exists || latest.autoConfirmedAt || !AUTO_START_READY_STATUSES.includes(latest.status)) {
+            return false;
+          }
+          transaction.update(doc.ref, {
+            status: 'confirmed',
+            autoConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          return true;
+        });
+        if (confirmed) {
+          autoConfirmed += 1;
+          await deliverAutoNotification(
+            { ...booking, id: doc.id },
+            `ถึงเวลานัดของคุณแล้ว เลขคิว ${booking.queueNumber} กรุณายืนยันว่ามาถึงศูนย์บริการภายใน 5 นาที`,
+            'ถึงเวลานัดแล้ว',
+            'appointment_due',
+          );
+        }
+      }
+      continue;
+    }
 
     const updated = await db.runTransaction(async (transaction) => {
       const current = await transaction.get(doc.ref);
       const latest = current.data();
-      if (!current.exists || !AUTO_CONFIRM_READY_STATUSES.includes(latest.status)) {
-        return false;
-      }
-      if (latest.autoConfirmedAt) {
+      if (!current.exists || !isReadyToAutoStart(latest, now)) {
         return false;
       }
 
       transaction.update(doc.ref, {
-        status: 'confirmed',
+        status: 'in_service',
         confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-        autoConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        autoStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+        serviceStartedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      transaction.set(db.collection('queue_status').doc(today), {
+        currentQueue: latest.queueNumber,
+        currentBookId: doc.id,
+        currentStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
       return true;
     });
 
     if (!updated) continue;
-    confirmed += 1;
+    started += 1;
 
-    const message = `ถึงเวลานัดของคุณแล้ว เลขคิว ${booking.queueNumber} ระบบยืนยันการเข้ารับบริการแล้ว กรุณาเข้ารับบริการตามเวลานัด`;
-    await deliverAutoNotification({ ...booking, id: doc.id }, message, 'ถึงเวลานัดแล้ว', 'auto_confirm');
+    const message = `เริ่มให้บริการคิว ${booking.queueNumber} อัตโนมัติแล้ว`;
+    await deliverAutoNotification({ ...booking, id: doc.id }, message, 'เริ่มให้บริการแล้ว', 'auto_start');
   }
 
-  return { checked: snap.size, confirmed };
+  return { checked: snap.size, autoConfirmed, started, cancelled };
+}
+
+async function autoCompleteDueBookings(now = new Date(), snapshot = null) {
+  const today = getToday(now);
+  let snap;
+  try {
+    snap = snapshot || await db.collection(COLLECTIONS.BOOKINGS)
+      .where('bookingDate', '==', today)
+      .get();
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      markQuotaExceeded(error);
+      console.warn('Firestore quota exceeded while auto-completing bookings; skipping cycle.');
+      return { checked: 0, completed: 0, quotaExceeded: true };
+    }
+    throw error;
+  }
+
+  let completed = 0;
+  for (const doc of snap.docs) {
+    const booking = doc.data();
+    if (!isServiceCompleteDue(booking, now)) continue;
+
+    const updated = await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(doc.ref);
+      const latest = current.data();
+      if (!current.exists || !isServiceCompleteDue(latest, now)) return false;
+
+      const queueRef = db.collection('queue_status').doc(today);
+      const queueDoc = await transaction.get(queueRef);
+      transaction.update(doc.ref, {
+        status: 'done',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        autoCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      const queueUpdate = {
+        doneCount: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (queueDoc.exists && queueDoc.data().currentBookId === doc.id) {
+        queueUpdate.currentQueue = null;
+        queueUpdate.currentBookId = null;
+        queueUpdate.currentStartedAt = null;
+      }
+      transaction.set(queueRef, queueUpdate, { merge: true });
+      return true;
+    });
+    if (!updated) continue;
+
+    completed += 1;
+    await deliverAutoNotification(
+      { ...booking, id: doc.id },
+      `บริการนวดคิว ${booking.queueNumber} เสร็จสิ้นแล้ว ขอบคุณที่มาใช้บริการ`,
+      'บริการเสร็จสิ้น',
+      'service_completed',
+    );
+  }
+  return { checked: snap.size, completed };
 }
 
 async function autoCallUpcomingBookings(now = new Date(), snapshot = null) {
@@ -131,7 +301,6 @@ async function autoCallUpcomingBookings(now = new Date(), snapshot = null) {
       transaction.update(doc.ref, {
         status: 'auto_called',
         autoCalledAt: admin.firestore.FieldValue.serverTimestamp(),
-        calledAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       transaction.set(db.collection('queue_status').doc(today), {
         lastAutoCalledQueue: latest.queueNumber,
@@ -143,7 +312,7 @@ async function autoCallUpcomingBookings(now = new Date(), snapshot = null) {
 
     if (!updated) continue;
     called += 1;
-    const message = `ใกล้ถึงเวลานัดของคุณแล้ว 15 นาที เลขคิว ${booking.queueNumber} กรุณาเตรียมตัวมาที่ศูนย์บริการ`;
+    const message = `ใกล้ถึงเวลานัดของคุณแล้ว 15 นาที เลขคิว ${booking.queueNumber} กรุณาเปิดแอปและกดยืนยันเมื่อมาถึงศูนย์บริการ`;
     await deliverAutoNotification({ ...booking, id: doc.id }, message, 'ใกล้ถึงเวลานัด', 'auto_call');
   }
   return { checked: snap.size, called };
@@ -160,16 +329,15 @@ async function runAutoCallCycle(now = new Date()) {
     if (isQuotaExceededError(error)) {
       markQuotaExceeded(error);
       console.warn('Firestore quota exceeded for auto-call cycle; pausing cycle until quota resets.');
-      return { checked: 0, quotaExceeded: true, autoCall: { checked: 0, called: 0, quotaExceeded: true }, autoConfirm: { checked: 0, confirmed: 0, quotaExceeded: true } };
+      return { checked: 0, quotaExceeded: true, autoCall: { checked: 0, called: 0, quotaExceeded: true }, autoStart: { checked: 0, started: 0, quotaExceeded: true } };
     }
     throw error;
   }
 
-  const [autoCall, autoConfirm] = await Promise.all([
-    autoCallUpcomingBookings(now, snapshot),
-    autoConfirmDueBookings(now, snapshot),
-  ]);
-  return { checked: snapshot.size, autoCall, autoConfirm };
+  const autoCall = await autoCallUpcomingBookings(now, snapshot);
+  const autoStart = await autoStartDueBookings(now, snapshot);
+  const autoComplete = await autoCompleteDueBookings(now, snapshot);
+  return { checked: snapshot.size, autoCall, autoStart, autoComplete };
 }
 
 function startAutoCallWorker() {
@@ -186,15 +354,20 @@ function startAutoCallWorker() {
     });
   };
   run();
-  return setInterval(run, 5 * 60 * 1000);
+  return setInterval(run, 60 * 1000);
 }
 
 module.exports = {
   autoCallUpcomingBookings,
-  autoConfirmDueBookings,
+  autoStartDueBookings,
+  autoCompleteDueBookings,
   runAutoCallCycle,
   startAutoCallWorker,
   getToday,
   appointmentDate,
+  isReadyToAutoStart,
+  isNoShowDue,
+  isServiceCompleteDue,
+  timestampDate,
   isQuotaExceededError,
 };

@@ -4,5 +4,10 @@ node_modules/
 server/node_modules/
 functions/node_modules/
 flutter-app/
+.venv/
+output/
+.vscode/
 *.env
 serviceAccountKey.json
+.env
+.env.*

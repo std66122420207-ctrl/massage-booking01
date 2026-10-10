@@ -1,11 +1,11 @@
 {
-    "name": "massage_booking",
-    "short_name": "massage_booking",
+    "name": "นวดแผนไทย ท่าวังหิน",
+    "short_name": "ท่าวังหิน",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F0F5F2",
+    "theme_color": "#2E7D52",
+    "description": "ระบบจองคิวนวดแผนไทยและคลินิกแพทย์แผนไทย ท่าวังหิน",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

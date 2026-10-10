@@ -68,6 +68,10 @@ const defaultOrigins = [
   'http://127.0.0.1:8081',
   'http://127.0.0.1:4000',
   'http://127.0.0.1:3000',
+  'https://massage-booking-ce032.web.app',
+  'https://massage-booking-ce032.firebaseapp.com',
+  'https://massage-booking-customer.web.app',
+  'https://massage-booking-customer.firebaseapp.com',
 ];
 const allowedOrigins = (process.env.FRONTEND_URL || defaultOrigins.join(','))
   .split(',')

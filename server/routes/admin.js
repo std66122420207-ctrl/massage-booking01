@@ -4,6 +4,7 @@ const { db, COLLECTIONS } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const googleSheets = require('../services/googleSheets');
 const mailer       = require('../services/mailer');
+const { getBangkokDate } = require('../services/bookingPolicy');
 const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue } = require('../services/firestoreGuard');
 
 function isBookingCounted(booking) {
@@ -64,7 +65,7 @@ router.post('/sync-sheets', async (req, res) => {
 // body: { bookingDate: "2026-08-02" } (default = วันนี้)
 router.post('/notify-therapists', async (req, res) => {
   try {
-    const bookingDate = req.body.bookingDate || new Date().toISOString().slice(0, 10);
+    const bookingDate = req.body.bookingDate || getBangkokDate();
     const { bookings, staffById, userById } = await loadBookingsWithContext(bookingDate);
 
     const activeBookings = bookings.filter((b) => b.status === 'pending' || b.status === 'confirmed');

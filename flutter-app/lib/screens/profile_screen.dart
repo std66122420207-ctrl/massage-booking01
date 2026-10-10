@@ -48,23 +48,18 @@ class ProfileScreen extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       color: navy)),
               const SizedBox(height: 4),
-              auth.user?.loginMethod == 'thaid'
-                  ? const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text('ยืนยันตัวตนด้วย ThaiD',
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xFF777777))),
-                      SizedBox(width: 4),
-                      Icon(Icons.verified, size: 14, color: sage),
-                    ])
-                  : const Text('ล็อกอินด้วยเบอร์โทร',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF777777))),
+              Text(
+                auth.user?.email ?? '-',
+                style:
+                    const TextStyle(fontSize: 12, color: Color(0xFF777777)),
+              ),
             ]),
           ),
           const SizedBox(height: 16),
           _section('ข้อมูลส่วนตัว', [
             _row('เบอร์โทร', auth.user?.phone ?? '-'),
-            _row('วิธีเข้าสู่ระบบ',
-                auth.user?.loginMethod == 'thaid' ? 'ThaiD' : 'เบอร์โทรศัพท์'),
+            _row('อีเมล', auth.user?.email ?? '-'),
+            _row('เลขบัตรประชาชน', auth.user?.citizenId ?? '-'),
           ]),
           const SizedBox(height: 24),
           SizedBox(

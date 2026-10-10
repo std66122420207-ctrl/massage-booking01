@@ -1,275 +1,199 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
-import '../config/api_config.dart';
 import 'api_client.dart';
-
-// dart:html เข้าถึงได้เฉพาะบน Flutter Web — โปรเจคนี้ตอนนี้ตั้งค่าไว้สำหรับ
-// web เท่านั้น (ดู flutter-app/web/) ถ้าจะเพิ่ม Android/iOS ในอนาคต ต้องแยก
-// ธุรกิจ ThaiD login ส่วนนี้ไปใช้ deep link (เช่น app_links package) แทน
-// การ redirect ทั้งหน้าเว็บแบบนี้
-import 'thaid_web_redirect.dart' if (dart.library.io) 'thaid_stub.dart'
-    as thaid;
 
 class AuthService extends ChangeNotifier {
   UserModel? _user;
   bool _loading = false;
   String? _error;
 
-  // เก็บ verificationId ระหว่างขั้นตอนส่ง OTP -> ยืนยัน OTP
-  String? _verificationId;
-  String? _pendingName;
-
   UserModel? get user => _user;
   bool get loading => _loading;
   bool get isLoggedIn => _user != null;
   String? get error => _error;
 
-  /// เรียกตอนเปิดแอป: เช็คว่า login ค้างอยู่ไหม (Firebase session)
-  /// และเช็ค URL ว่ากลับมาจาก ThaiD callback พร้อม custom token หรือไม่
   Future<void> checkAuthState() async {
-    // 1) ถ้ากลับมาจาก ThaiD redirect จะมี token ติดมาใน URL query string
-    final thaidToken = thaid.consumeThaidTokenFromUrl();
-    if (thaidToken != null) {
-      await _signInWithCustomToken(thaidToken, loginMethod: 'thaid');
+    final current = fb.FirebaseAuth.instance.currentUser;
+    if (current == null) {
+      _user = null;
       return;
     }
 
-    // 2) ถ้ามี Firebase session ค้างอยู่แล้ว (เช่นรีเฟรชหน้าเว็บ)
-    final current = fb.FirebaseAuth.instance.currentUser;
-    if (current != null) {
-      await _loadProfileFromBackend(current, fallbackLoginMethod: 'phone');
-    }
-  }
-
-  /// Step 1: พาไปหน้า login ของ ThaiD ผ่าน backend (redirect ทั้งหน้า)
-  /// Backend จะ redirect กลับมาที่แอปพร้อม custom token ต่อท้าย URL
-  /// เมื่อ login สำเร็จ (ดู server/routes/auth.js: /thaid/callback)
-  Future<void> loginWithThaiD() async {
-    thaid.redirectToThaidLogin('${ApiConfig.baseUrl}/auth/thaid');
-    // หน้าเว็บจะถูก redirect ออกไปจากตรงนี้ทันที ฟังก์ชันนี้จะไม่ return ค่าอะไรต่อ
-  }
-
-  /// Step 1: ส่ง OTP ไปที่เบอร์โทร (Firebase Phone Auth ของจริง)
-  Future<void> sendOTP(String phone) async {
-    _error = null;
-    _loading = true;
-    _verificationId = null;
-    notifyListeners();
-
-    final e164Phone = _toE164(phone);
-    final completer = Completer<void>();
-
+    _setLoading(true);
     try {
-      await fb.FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: e164Phone,
-        timeout: const Duration(seconds: 60),
-        verificationCompleted: (fb.PhoneAuthCredential credential) async {
-          try {
-            final cred =
-                await fb.FirebaseAuth.instance.signInWithCredential(credential);
-            if (cred.user != null) {
-              await _loadProfileFromBackend(cred.user!,
-                  fallbackLoginMethod: 'phone');
-            }
-          } catch (e) {
-            _error = 'ยืนยันอัตโนมัติล้มเหลว: $e';
-          }
-          _loading = false;
-          notifyListeners();
-          if (!completer.isCompleted) completer.complete();
-        },
-        verificationFailed: (fb.FirebaseAuthException e) {
-          _error = _mapAuthError(e);
-          _loading = false;
-          notifyListeners();
-          if (!completer.isCompleted) {
-            completer.completeError(Exception(_error));
-          }
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          _verificationId = verificationId;
-          _loading = false;
-          notifyListeners();
-          if (!completer.isCompleted) completer.complete();
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          _verificationId = verificationId;
-        },
-      );
-    } catch (e) {
-      _loading = false;
-      _error = e is fb.FirebaseAuthException
-          ? _mapAuthError(e)
-          : 'เริ่มส่ง OTP ไม่สำเร็จ: $e';
-      notifyListeners();
-      if (!completer.isCompleted) completer.completeError(Exception(_error));
+      _user = await _loadOrCreateProfile(current);
+    } finally {
+      _setLoading(false);
     }
-
-    return completer.future;
   }
 
-  /// Step 2: ยืนยัน OTP 6 หลัก แล้วบันทึกโปรไฟล์ไปที่ backend
-  Future<void> verifyOTP(String otp, String name) async {
-    if (_verificationId == null) {
-      throw Exception('กรุณาขอ OTP ใหม่อีกครั้ง');
-    }
-    final safeName = name.trim();
-    if (safeName.isEmpty) {
-      throw Exception('กรุณากรอกชื่อ-นามสกุลก่อนยืนยัน OTP');
-    }
-
-    _loading = true;
-    _pendingName = safeName;
-    notifyListeners();
-
+  Future<void> registerWithEmail({
+    required String name,
+    required String citizenId,
+    required String phone,
+    required String email,
+    required String password,
+  }) async {
+    _setLoading(true);
     try {
-      final credential = fb.PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otp,
+      final credential = await fb.FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
       );
-      final userCred =
-          await fb.FirebaseAuth.instance.signInWithCredential(credential);
-      if (userCred.user == null) {
-        throw Exception('เข้าสู่ระบบไม่สำเร็จ');
+      final user = credential.user;
+      if (user == null) throw Exception('สร้างบัญชีไม่สำเร็จ');
+
+      final profile = <String, dynamic>{
+        'uid': user.uid,
+        'name': name.trim(),
+        'citizenId': citizenId.trim(),
+        'phone': phone.trim(),
+        'email': email.trim(),
+        'role': 'user',
+        'loginMethod': 'email',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set(profile);
+      } catch (error) {
+        try {
+          await user.delete();
+        } catch (deleteError) {
+          await fb.FirebaseAuth.instance.signOut();
+          throw Exception(
+            'บันทึกข้อมูลผู้ใช้ไม่สำเร็จ และยกเลิกบัญชีที่สร้างไว้ไม่ได้ '
+            'กรุณาติดต่อผู้ดูแลระบบ ($deleteError)',
+          );
+        }
+        throw Exception('บันทึกข้อมูลผู้ใช้ลง Firestore ไม่สำเร็จ ($error)');
       }
 
-      _user = UserModel(
-        uid: userCred.user!.uid,
-        name: safeName,
-        phone: userCred.user!.phoneNumber ?? '',
-        loginMethod: 'phone',
-      );
-      notifyListeners();
-
-      await _registerOrLoadProfile(userCred.user!,
-          name: safeName, phone: userCred.user!.phoneNumber ?? '');
+      _user = UserModel.fromMap(profile..remove('createdAt')..remove('updatedAt'));
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e));
     } finally {
-      _loading = false;
-      notifyListeners();
+      _setLoading(false);
+    }
+  }
+
+  Future<void> loginWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    _setLoading(true);
+    try {
+      final credential =
+          await fb.FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = credential.user;
+      if (user == null) throw Exception('เข้าสู่ระบบไม่สำเร็จ');
+      _user = await _loadOrCreateProfile(user);
+    } on fb.FirebaseAuthException catch (e) {
+      throw Exception(_mapAuthError(e));
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    _setLoading(true);
+    try {
+      await fb.FirebaseAuth.instance
+          .sendPasswordResetEmail(email: email.trim());
+    } on fb.FirebaseAuthException catch (e) {
+      throw Exception(_mapAuthError(e));
+    } finally {
+      _setLoading(false);
     }
   }
 
   Future<void> logout() async {
     await fb.FirebaseAuth.instance.signOut();
     _user = null;
-    _verificationId = null;
     notifyListeners();
   }
 
-  /// อัปเดตเบอร์โทร — ใช้กับผู้ใช้ที่ login ผ่าน ThaiD ซึ่งไม่ได้กรอกเบอร์ตอน login
-  /// (เก็บไว้เป็นเบอร์สำรองให้แอดมินติดต่อกรณีแอปแจ้งเตือนไม่ถึง)
   Future<void> updatePhone(String phone) async {
     await ApiClient.patch('/auth/me', {'phone': phone});
+    final current = fb.FirebaseAuth.instance.currentUser;
+    if (current != null) {
+      await FirebaseFirestore.instance.collection('users').doc(current.uid).set(
+        {'phone': phone, 'updatedAt': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    }
     if (_user != null) {
-      _user = UserModel(
-        uid: _user!.uid,
-        name: _user!.name,
-        phone: phone,
-        loginMethod: _user!.loginMethod,
-        needsPhone: false,
-      );
+      _user = _user!.copyWith(phone: phone, needsPhone: false);
       notifyListeners();
     }
   }
 
-  // ── Helpers ─────────────────────────────────────────────
+  Future<UserModel> _loadOrCreateProfile(fb.User user) async {
+    final docRef =
+        FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final snapshot = await docRef.get();
 
-  Future<void> _signInWithCustomToken(String token,
-      {required String loginMethod}) async {
-    _loading = true;
-    notifyListeners();
-    try {
-      final cred = await fb.FirebaseAuth.instance.signInWithCustomToken(token);
-      if (cred.user != null) {
-        await _loadProfileFromBackend(cred.user!,
-            fallbackLoginMethod: loginMethod);
-      }
-    } catch (e) {
-      _error = 'เข้าสู่ระบบด้วย ThaiD ไม่สำเร็จ: $e';
-    } finally {
-      _loading = false;
-      notifyListeners();
+    if (!snapshot.exists) {
+      final profile = <String, dynamic>{
+        'uid': user.uid,
+        'name': user.displayName ?? 'ผู้ใช้',
+        'email': user.email ?? '',
+        'phone': user.phoneNumber,
+        'role': 'user',
+        'loginMethod': user.email == null ? 'phone' : 'email',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      await docRef.set(profile);
+      profile.remove('createdAt');
+      profile.remove('updatedAt');
+      return UserModel.fromMap(profile);
     }
+
+    final data = snapshot.data()!;
+    return UserModel.fromMap({
+      ...data,
+      'uid': user.uid,
+      'email': data['email'] ?? user.email ?? '',
+      'phone': data['phone'] ?? user.phoneNumber,
+    });
   }
 
-  /// พยายามโหลดโปรไฟล์จาก backend (GET /api/auth/me); ถ้ายังไม่มี ให้สร้างค่าเริ่มต้น
-  Future<void> _loadProfileFromBackend(fb.User fbUser,
-      {required String fallbackLoginMethod}) async {
-    try {
-      final data = await ApiClient.get('/auth/me');
-      final profile = Map<String, dynamic>.from(data);
-      final resolvedName = (profile['name'] ?? '').toString().trim();
-      _user = UserModel.fromMap(profile).copyWith(
-        name: resolvedName.isNotEmpty
-            ? resolvedName
-            : (_pendingName ?? fbUser.displayName ?? 'ผู้ใช้'),
-      );
-    } on ApiException catch (e) {
-      if (e.statusCode == 404) {
-        // ยังไม่เคยลงทะเบียนโปรไฟล์ — ใช้ข้อมูลเท่าที่มีจาก Firebase ไปก่อน
-        _user = UserModel(
-          uid: fbUser.uid,
-          name: fbUser.displayName ?? _pendingName ?? 'ผู้ใช้',
-          phone: fbUser.phoneNumber,
-          loginMethod: fallbackLoginMethod,
-        );
-      } else {
-        _error = e.message;
-      }
-    } catch (e) {
-      _error = 'โหลดโปรไฟล์ไม่สำเร็จ: $e';
-    }
+  void _setLoading(bool value) {
+    _loading = value;
+    if (value) _error = null;
     notifyListeners();
-  }
-
-  /// ลงทะเบียนผู้ใช้ใหม่ (หรืออัปเดตชื่อ) ที่ backend หลัง phone OTP สำเร็จ
-  Future<void> _registerOrLoadProfile(fb.User fbUser,
-      {required String name, required String phone}) async {
-    try {
-      await ApiClient.post('/auth/register', {
-        'uid': fbUser.uid,
-        'name': name,
-        'phone': phone,
-      });
-      _user = UserModel(
-          uid: fbUser.uid, name: name, phone: phone, loginMethod: 'phone');
-    } catch (e) {
-      _error = 'บันทึกโปรไฟล์ไม่สำเร็จ: $e';
-      // ยังให้ user ใช้แอปต่อได้ด้วยข้อมูลจาก Firebase แม้ backend จะพลาด
-      _user = UserModel(
-          uid: fbUser.uid, name: name, phone: phone, loginMethod: 'phone');
-    }
-    notifyListeners();
-  }
-
-  String _toE164(String phone) {
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
-    if (digits.startsWith('0')) return '+66${digits.substring(1)}'; // เบอร์ไทย
-    if (phone.startsWith('+')) return phone;
-    return '+66$digits';
   }
 
   String _mapAuthError(fb.FirebaseAuthException e) {
     switch (e.code) {
-      case 'app-not-authorized':
-        return 'โดเมนนี้ยังไม่ได้อนุญาตใน Firebase Authentication';
-      case 'captcha-check-failed':
-        return 'ยืนยัน reCAPTCHA ไม่สำเร็จ กรุณารีเฟรชหน้าแล้วลองใหม่';
-      case 'quota-exceeded':
-        return 'โควตาส่ง SMS หมดชั่วคราว กรุณาลองใหม่ภายหลัง';
-      case 'invalid-phone-number':
-        return 'เบอร์โทรศัพท์ไม่ถูกต้อง';
-      case 'invalid-verification-code':
-        return 'รหัส OTP ไม่ถูกต้อง';
-      case 'session-expired':
-        return 'รหัส OTP หมดอายุ กรุณาขอใหม่';
+      case 'email-already-in-use':
+        return 'อีเมลนี้มีบัญชีอยู่แล้ว';
+      case 'invalid-email':
+        return 'รูปแบบอีเมลไม่ถูกต้อง';
+      case 'weak-password':
+        return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+      case 'user-disabled':
+        return 'บัญชีนี้ถูกระงับการใช้งาน';
       case 'too-many-requests':
-        return 'ขอ OTP บ่อยเกินไป กรุณาลองใหม่ภายหลัง';
+        return 'ทำรายการบ่อยเกินไป กรุณาลองใหม่ภายหลัง';
+      case 'network-request-failed':
+        return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่';
       default:
         return e.message ?? 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
     }

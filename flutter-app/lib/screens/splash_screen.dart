@@ -17,15 +17,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _init() async {
     final auth = context.read<AuthService>();
-    // ตรวจสอบ ThaiD callback token ใน URL และ session ที่ค้างอยู่
     await auth.checkAuthState();
     // ดีเลย์เล็กน้อยเพื่อให้เห็น splash screen (ไม่จำเป็นต้องมีถ้าไม่ชอบ)
     await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
     if (!auth.isLoggedIn) {
       Navigator.pushReplacementNamed(context, '/login');
-    } else if (auth.user!.needsPhone) {
-      Navigator.pushReplacementNamed(context, '/phone-required');
     } else {
       Navigator.pushReplacementNamed(context, '/home');
     }

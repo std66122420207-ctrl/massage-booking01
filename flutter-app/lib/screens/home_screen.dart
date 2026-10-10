@@ -60,30 +60,56 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _tab, children: _screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        backgroundColor: Colors.white,
-        elevation: 4,
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'หน้าแรก'),
-          NavigationDestination(
-              icon: Icon(Icons.calendar_today_outlined),
-              selectedIcon: Icon(Icons.calendar_today),
-              label: 'การจอง'),
-          NavigationDestination(
-              icon: Icon(Icons.queue_outlined),
-              selectedIcon: Icon(Icons.queue),
-              label: 'คิว'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'โปรไฟล์'),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final width =
+              constraints.maxWidth > 480 ? 480.0 : constraints.maxWidth;
+          return Center(
+            child: SizedBox(
+              width: width,
+              height: constraints.maxHeight,
+              child: IndexedStack(index: _tab, children: _screens),
+            ),
+          );
+        },
+      ),
+      bottomNavigationBar: SizedBox(
+        height: 80,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width =
+                constraints.maxWidth > 480 ? 480.0 : constraints.maxWidth;
+            return Center(
+              child: SizedBox(
+                width: width,
+                child: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (i) => setState(() => _tab = i),
+                backgroundColor: Colors.white,
+                elevation: 4,
+                destinations: const [
+                  NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: 'หน้าแรก'),
+                  NavigationDestination(
+                      icon: Icon(Icons.calendar_today_outlined),
+                      selectedIcon: Icon(Icons.calendar_today),
+                      label: 'การจอง'),
+                  NavigationDestination(
+                      icon: Icon(Icons.queue_outlined),
+                      selectedIcon: Icon(Icons.queue),
+                      label: 'คิว'),
+                  NavigationDestination(
+                      icon: Icon(Icons.person_outline),
+                      selectedIcon: Icon(Icons.person),
+                      label: 'โปรไฟล์'),
+                ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

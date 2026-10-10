@@ -36,6 +36,19 @@ const API = {
     return this._request('/staff');
   },
 
+  async uploadStaffPhoto(file) {
+    const token = await this._token();
+    const headers = {
+      'Content-Type': file.type,
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+    return this._request('/staff/photo', {
+      method: 'POST',
+      headers,
+      body: file,
+    });
+  },
+
   async updateStaff(id, data) {
     return this._request(`/staff/${id}`, {
       method: 'PATCH',
@@ -69,6 +82,11 @@ const API = {
 
   async getTodayBookings() {
     return this._request('/bookings/admin/today', {
+      headers: await this._headers(),
+    });
+  },
+  async getUpcomingBookings() {
+    return this._request('/bookings/admin/upcoming', {
       headers: await this._headers(),
     });
   },
@@ -119,21 +137,6 @@ const API = {
       method: 'POST',
       headers: await this._headers(),
       body: JSON.stringify({ bookingId }),
-    });
-  },
-
-  async syncSheets() {
-    return this._request('/admin/sync-sheets', {
-      method: 'POST',
-      headers: await this._headers(),
-    });
-  },
-
-  async notifyTherapists(bookingDate) {
-    return this._request('/admin/notify-therapists', {
-      method: 'POST',
-      headers: await this._headers(),
-      body: JSON.stringify({ bookingDate }),
     });
   },
 

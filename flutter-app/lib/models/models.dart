@@ -135,26 +135,49 @@ class BookingModel {
     const map = {
       'pending': 'รอยืนยัน',
       'confirmed': 'ยืนยันแล้ว',
+      'auto_called': 'เรียกคิวแล้ว',
       'in_service': 'กำลังให้บริการ',
       'done': 'เสร็จแล้ว',
       'cancelled': 'ยกเลิก',
     };
     return map[status] ?? status;
   }
+
+  BookingModel copyWith({String? status}) => BookingModel(
+        id: id,
+        userId: userId,
+        serviceId: serviceId,
+        serviceName: serviceName,
+        servicePrice: servicePrice,
+        staffId: staffId,
+        staffName: staffName,
+        bookingDate: bookingDate,
+        timeSlot: timeSlot,
+        queueNumber: queueNumber,
+        status: status ?? this.status,
+        healthcareRight: healthcareRight,
+        nationalId: nationalId,
+        channel: channel,
+        createdAt: createdAt,
+      );
 }
 
 // ── models/user_model.dart ─────────────────────────────────
 class UserModel {
   final String uid;
   final String name;
+  final String? citizenId;
   final String? phone;
-  final String loginMethod; // thaid | phone
-  final bool needsPhone; // true ถ้ายังไม่มีเบอร์โทร (เช่น login ผ่าน ThaiD)
+  final String? email;
+  final String loginMethod; // email | phone
+  final bool needsPhone;
 
   const UserModel({
     required this.uid,
     required this.name,
+    this.citizenId,
     this.phone,
+    this.email,
     required this.loginMethod,
     this.needsPhone = false,
   });
@@ -163,7 +186,9 @@ class UserModel {
     return UserModel(
       uid: m['uid'] ?? '',
       name: m['name'] ?? '',
+      citizenId: m['citizenId'],
       phone: m['phone'],
+      email: m['email'],
       loginMethod: m['loginMethod'] ?? 'phone',
       needsPhone: m['needsPhone'] ?? (m['phone'] == null),
     );
@@ -172,14 +197,18 @@ class UserModel {
   UserModel copyWith({
     String? uid,
     String? name,
+    String? citizenId,
     String? phone,
+    String? email,
     String? loginMethod,
     bool? needsPhone,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
       name: name ?? this.name,
+      citizenId: citizenId ?? this.citizenId,
       phone: phone ?? this.phone,
+      email: email ?? this.email,
       loginMethod: loginMethod ?? this.loginMethod,
       needsPhone: needsPhone ?? this.needsPhone,
     );
@@ -192,12 +221,16 @@ class UserModel {
 class NotificationModel {
   final String id;
   final String message;
+  final String type;
+  final String? resolvedAction;
   final bool confirmed;
   final DateTime? createdAt;
 
   const NotificationModel({
     required this.id,
     required this.message,
+    this.type = 'general',
+    this.resolvedAction,
     required this.confirmed,
     this.createdAt,
   });
@@ -206,6 +239,8 @@ class NotificationModel {
     return NotificationModel(
       id: id,
       message: m['message'] ?? '',
+      type: m['type'] ?? 'general',
+      resolvedAction: m['resolvedAction'],
       confirmed: m['confirmed'] ?? false,
       createdAt: _parseFirestoreTimestamp(m['createdAt']),
     );

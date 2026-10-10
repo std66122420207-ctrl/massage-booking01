@@ -4,11 +4,12 @@ const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { createNotification } = require('./notifications');
 const { sendPushToUser } = require('./fcm');
+const { getBangkokDate } = require('../services/bookingPolicy');
 const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue } = require('../services/firestoreGuard');
 
 // ── GET /api/queue/status — สถานะคิวปัจจุบัน (Public) ───────
 router.get('/status', async (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getBangkokDate();
   const cacheKey = `queue-status:${today}`;
   const cached = getCachedValue(cacheKey, 30_000);
   if (cached !== undefined) {
@@ -47,7 +48,7 @@ router.get('/status', async (req, res) => {
 
 // ── GET /api/queue/my — ตำแหน่งคิวของผู้ใช้ ───────────────
 router.get('/my', verifyToken, async (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getBangkokDate();
   const cacheKey = `queue-my:${req.user.uid}:${today}`;
   const cached = getCachedValue(cacheKey, 60_000);
   if (cached !== undefined) {
@@ -64,7 +65,7 @@ router.get('/my', verifyToken, async (req, res) => {
     const mySnap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('userId', '==', req.user.uid)
       .where('bookingDate', '==', today)
-      .where('status', 'in', ['pending', 'confirmed', 'auto_called'])
+      .where('status', 'in', ['pending', 'confirmed', 'auto_called', 'in_service'])
       .limit(20)
       .get();
 
@@ -98,7 +99,7 @@ router.get('/my', verifyToken, async (req, res) => {
 // ── POST /api/queue/call-next — Admin: เรียกคิวถัดไป ────────
 router.post('/call-next', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getBangkokDate();
 
     // หาคิวถัดไป (pending/confirmed เรียงตามเวลา)
     const snap = await db.collection(COLLECTIONS.BOOKINGS)
@@ -125,12 +126,14 @@ router.post('/call-next', verifyToken, requireAdmin, async (req, res) => {
     batch.update(next.ref, {
       status:        'in_service',
       calledAt:      admin.firestore.FieldValue.serverTimestamp(),
+      serviceStartedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     // อัปเดต queue_status document
     batch.set(db.collection('queue_status').doc(today), {
       currentQueue:  data.queueNumber,
       currentBookId: next.id,
+      currentStartedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt:     admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
@@ -169,7 +172,7 @@ router.post('/call', verifyToken, requireAdmin, async (req, res) => {
   if (!bookingId) return res.status(400).json({ error: 'กรุณาระบุ bookingId' });
 
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getBangkokDate();
     const ref = db.collection(COLLECTIONS.BOOKINGS).doc(bookingId);
     const doc = await ref.get();
     if (!doc.exists) return res.status(404).json({ error: 'ไม่พบการจอง' });
@@ -179,10 +182,16 @@ router.post('/call', verifyToken, requireAdmin, async (req, res) => {
       return res.status(409).json({ error: 'คิวนี้ไม่อยู่ในสถานะรอเรียก' });
     }
 
-    await ref.update({ status: 'in_service', calledAt: admin.firestore.FieldValue.serverTimestamp() });
+    await ref.update({
+      status: 'in_service',
+      calledAt: admin.firestore.FieldValue.serverTimestamp(),
+      serviceStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
     await db.collection('queue_status').doc(today).set({
       currentQueue: data.queueNumber,
       currentBookId: bookingId,
+      currentStartedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
     createNotification({
@@ -209,23 +218,36 @@ router.post('/complete', verifyToken, requireAdmin, async (req, res) => {
   if (!bookingId) return res.status(400).json({ error: 'กรุณาระบุ bookingId' });
 
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const ref   = db.collection(COLLECTIONS.BOOKINGS).doc(bookingId);
-    const batch = db.batch();
+    const today = getBangkokDate();
+    const ref = db.collection(COLLECTIONS.BOOKINGS).doc(bookingId);
+    const result = await db.runTransaction(async (transaction) => {
+      const bookingDoc = await transaction.get(ref);
+      if (!bookingDoc.exists) return { status: 404, error: 'ไม่พบการจอง' };
+      if (bookingDoc.data().status !== 'in_service') {
+        return { status: 409, error: 'คิวนี้ไม่ได้อยู่ระหว่างให้บริการ' };
+      }
 
-    batch.update(ref, {
-      status:      'done',
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      const queueRef = db.collection('queue_status').doc(today);
+      const queueDoc = await transaction.get(queueRef);
+      transaction.update(ref, {
+        status: 'done',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      const queueUpdate = {
+        doneCount: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (queueDoc.exists && queueDoc.data().currentBookId === bookingId) {
+        queueUpdate.currentQueue = null;
+        queueUpdate.currentBookId = null;
+        queueUpdate.currentStartedAt = null;
+      }
+      transaction.set(queueRef, queueUpdate, { merge: true });
+      return { status: 200 };
     });
-
-    // เพิ่ม doneCount ใน queue_status
-    batch.set(db.collection('queue_status').doc(today), {
-      doneCount:   admin.firestore.FieldValue.increment(1),
-      currentQueue: null,
-      updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-
-    await batch.commit();
+    if (result.status !== 200) return res.status(result.status).json({ error: result.error });
     res.json({ success: true, message: 'บันทึกเสร็จสิ้นแล้ว' });
   } catch (err) {
     res.status(500).json({ error: err.message });

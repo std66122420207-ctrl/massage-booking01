@@ -157,7 +157,10 @@ class _BookingCard extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('ยกเลิกการจอง'),
-        content: Text('ต้องการยกเลิกคิว ${booking.queueNumber} ใช่หรือไม่?'),
+        content: Text(
+          'ต้องการยกเลิกคิว ${booking.queueNumber} ใช่หรือไม่? '
+          'เมื่อยกเลิกแล้วจะสามารถจองคิวใหม่ได้ตามสิทธิการรักษา',
+        ),
         actions: [
           TextButton.icon(
             onPressed: () => Navigator.pop(context, false),
@@ -183,7 +186,7 @@ class _BookingCard extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(cancelled
-            ? 'ยกเลิกคิว ${booking.queueNumber} สำเร็จแล้ว'
+            ? 'ยกเลิกคิว ${booking.queueNumber} แล้ว สามารถจองใหม่ได้ตามสิทธิ'
             : bookingService.error ?? 'ยกเลิกคิวไม่สำเร็จ กรุณาลองอีกครั้ง'),
         backgroundColor: cancelled ? Colors.green : Colors.red,
       ),

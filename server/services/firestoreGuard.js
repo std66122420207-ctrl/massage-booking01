@@ -41,6 +41,10 @@ function setCachedValue(key, value, ttlMs) {
   return value;
 }
 
+function deleteCachedValue(key) {
+  return state.cache.delete(key);
+}
+
 module.exports = {
   QUOTA_PAUSE_MS,
   isQuotaExceededError,
@@ -48,4 +52,5 @@ module.exports = {
   isQuotaPaused,
   getCachedValue,
   setCachedValue,
+  deleteCachedValue,
 };

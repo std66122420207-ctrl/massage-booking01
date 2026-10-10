@@ -1,286 +1,318 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/auth_service.dart';
+
+enum _AuthMode { login, register, resetPassword }
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _nameKey = 'remembered_customer_name';
-  static const _phoneKey = 'remembered_customer_phone';
-  static const _rememberKey = 'remember_customer_identity';
-
-  final _phoneCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
-  final _otpCtrl = TextEditingController();
-  bool _otpSent = false;
-  bool _rememberIdentity = true;
+  final _citizenIdCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedIdentity();
-  }
-
-  Future<void> _loadSavedIdentity() async {
-    final prefs = await SharedPreferences.getInstance();
-    final remember = prefs.getBool(_rememberKey) ?? true;
-    if (!mounted) return;
-    setState(() {
-      _rememberIdentity = remember;
-      _nameCtrl.text = remember ? (prefs.getString(_nameKey) ?? '') : '';
-      _phoneCtrl.text = remember ? (prefs.getString(_phoneKey) ?? '') : '';
-    });
-  }
-
-  Future<void> _saveIdentity() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_rememberIdentity) {
-      await prefs.setBool(_rememberKey, true);
-      await prefs.setString(_nameKey, _nameCtrl.text.trim());
-      await prefs.setString(_phoneKey, _phoneCtrl.text.trim());
-    } else {
-      await prefs.setBool(_rememberKey, false);
-      await prefs.remove(_nameKey);
-      await prefs.remove(_phoneKey);
-    }
-  }
+  _AuthMode _mode = _AuthMode.login;
+  bool _hidePassword = true;
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
     _nameCtrl.dispose();
-    _otpCtrl.dispose();
+    _citizenIdCtrl.dispose();
+    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _sendOTP() async {
-    final phone = _phoneCtrl.text.trim();
-    final name = _nameCtrl.text.trim();
-    final authService = context.read<AuthService>();
-
-    if (phone.isEmpty || name.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกชื่อและเบอร์โทร')),
-      );
-      return;
-    }
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final auth = context.read<AuthService>();
     try {
-      if (_rememberIdentity) {
-        await _saveIdentity();
+      switch (_mode) {
+        case _AuthMode.login:
+          await auth.loginWithEmail(
+            email: _emailCtrl.text,
+            password: _passwordCtrl.text,
+          );
+          if (mounted) Navigator.pushReplacementNamed(context, '/home');
+          break;
+        case _AuthMode.register:
+          await auth.registerWithEmail(
+            name: _nameCtrl.text,
+            citizenId: _citizenIdCtrl.text,
+            phone: _phoneCtrl.text,
+            email: _emailCtrl.text,
+            password: _passwordCtrl.text,
+          );
+          if (mounted) Navigator.pushReplacementNamed(context, '/home');
+          break;
+        case _AuthMode.resetPassword:
+          await auth.sendPasswordResetEmail(_emailCtrl.text);
+          if (!mounted) return;
+          setState(() => _mode = _AuthMode.login);
+          _showMessage('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลแล้ว');
+          break;
       }
-      await authService.sendOTP(phone);
-      if (!mounted) return;
-      setState(() => _otpSent = true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ส่ง OTP ไม่สำเร็จ: $e')),
-      );
+    } catch (error) {
+      if (mounted) _showMessage(error.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  Future<void> _verifyOTP() async {
-    final authService = context.read<AuthService>();
-
-    try {
-      await authService.verifyOTP(_otpCtrl.text.trim(), _nameCtrl.text.trim());
-      if (_rememberIdentity) {
-        await _saveIdentity();
-      }
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'ยืนยัน OTP ไม่สำเร็จ: ${e.toString().replaceFirst('Exception: ', '')}',
-          ),
-        ),
-      );
-    }
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
-    const sage = Color(0xFF7A9E7E);
-    const navy = Color(0xFF2D3B6B);
+    final isRegister = _mode == _AuthMode.register;
+    final isReset = _mode == _AuthMode.resetPassword;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAF7F2),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Column(children: [
-            const SizedBox(height: 40),
-
-            // Logo
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3)),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.asset('assets/images/logo.jpeg',
-                      fit: BoxFit.contain),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 20),
+                    Center(
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(12),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset('assets/images/logo.jpeg',
+                              fit: BoxFit.contain),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'นวดแผนไทย',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context)
+                          .textTheme
+                          .displayLarge
+                          ?.copyWith(fontSize: 28),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'ศูนย์สุขภาพชุมชนท่าวังหิน',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Color(0xFF777777)),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      isRegister
+                          ? 'สมัครสมาชิก'
+                          : isReset
+                              ? 'ลืมรหัสผ่าน'
+                              : 'เข้าสู่ระบบ',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 20),
+                    if (isRegister) ...[
+                      _field(
+                        _nameCtrl,
+                        'ชื่อ-นามสกุล',
+                        validator: _required('กรุณากรอกชื่อ-นามสกุล'),
+                        keyboardType: TextInputType.name,
+                      ),
+                      const SizedBox(height: 12),
+                      _field(
+                        _citizenIdCtrl,
+                        'เลขบัตรประชาชน 13 หลัก',
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final id = (value ?? '').trim();
+                          if (!RegExp(r'^\d{13}$').hasMatch(id)) {
+                            return 'กรุณากรอกเลขบัตรประชาชน 13 หลัก';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _field(
+                        _phoneCtrl,
+                        'เบอร์โทรศัพท์',
+                        keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          final phone = (value ?? '').replaceAll(
+                              RegExp(r'[\s-]'), '');
+                          if (!RegExp(r'^0\d{8,9}$').hasMatch(phone)) {
+                            return 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    _field(
+                      _emailCtrl,
+                      'Email',
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        final email = (value ?? '').trim();
+                        if (email.isEmpty ||
+                            !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                .hasMatch(email)) {
+                          return 'กรุณากรอกอีเมลให้ถูกต้อง';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (!isReset) ...[
+                      const SizedBox(height: 12),
+                      _field(
+                        _passwordCtrl,
+                        'Password',
+                        obscureText: _hidePassword,
+                        suffixIcon: IconButton(
+                          onPressed: () =>
+                              setState(() => _hidePassword = !_hidePassword),
+                          icon: Icon(_hidePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined),
+                        ),
+                        validator: (value) {
+                          if ((value ?? '').length < 6) {
+                            return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                    if (isRegister) ...[
+                      const SizedBox(height: 12),
+                      _field(
+                        _confirmPasswordCtrl,
+                        'ยืนยัน Password',
+                        obscureText: true,
+                        validator: (value) {
+                          if (value != _passwordCtrl.text) {
+                            return 'รหัสผ่านไม่ตรงกัน';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                    if (_mode == _AuthMode.login)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: auth.loading
+                              ? null
+                              : () => setState(
+                                  () => _mode = _AuthMode.resetPassword),
+                          child: const Text('ลืมรหัสผ่าน?'),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: auth.loading ? null : _submit,
+                      child: auth.loading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(
+                              isRegister
+                                  ? 'สมัครสมาชิก'
+                                  : isReset
+                                      ? 'ส่งอีเมลตั้งรหัสผ่านใหม่'
+                                      : 'เข้าสู่ระบบ',
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (!isReset)
+                      TextButton(
+                        onPressed: auth.loading
+                            ? null
+                            : () => setState(() {
+                                  _mode = isRegister
+                                      ? _AuthMode.login
+                                      : _AuthMode.register;
+                                }),
+                        child: Text(
+                          isRegister
+                              ? 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ'
+                              : 'ยังไม่มีบัญชี? สมัครสมาชิก',
+                        ),
+                      ),
+                    if (isReset)
+                      TextButton(
+                        onPressed: auth.loading
+                            ? null
+                            : () => setState(() => _mode = _AuthMode.login),
+                        child: const Text('กลับไปเข้าสู่ระบบ'),
+                      ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Text('นวดแผนไทย',
-                style: Theme.of(context)
-                    .textTheme
-                    .displayLarge
-                    ?.copyWith(fontSize: 28)),
-            const SizedBox(height: 6),
-            const Text('ศูนย์สุขภาพชุมชนท่าวังหิน',
-                style: TextStyle(fontSize: 14, color: Color(0xFF777777))),
-            const SizedBox(height: 48),
-
-            // ThaiD Button
-            _buildButton(
-              onTap: () => context.read<AuthService>().loginWithThaiD(),
-              color: navy,
-              icon: Icons.badge_outlined,
-              label: 'เข้าสู่ระบบด้วย ThaiD',
-            ),
-            const SizedBox(height: 16),
-
-            // Divider
-            Row(children: [
-              const Expanded(child: Divider()),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text('หรือ',
-                    style:
-                        TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-              ),
-              const Expanded(child: Divider()),
-            ]),
-            const SizedBox(height: 16),
-
-            // Phone form
-            if (!_otpSent) ...[
-              _field(_nameCtrl, 'ชื่อ-นามสกุล', TextInputType.name),
-              const SizedBox(height: 12),
-              _field(_phoneCtrl, 'เบอร์โทรศัพท์', TextInputType.phone),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _rememberIdentity,
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _rememberIdentity = value);
-                    },
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'จดจำชื่อและเบอร์โทรสำหรับล็อกอินครั้งต่อไป',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF4F4F4F)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _buildButton(
-                onTap: auth.loading ? null : _sendOTP,
-                color: sage,
-                icon: Icons.sms_outlined,
-                label: auth.loading ? 'กำลังส่ง OTP...' : 'รับ OTP',
-              ),
-            ] else ...[
-              Text('กรอกรหัส OTP ที่ได้รับ',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-              const SizedBox(height: 12),
-              _field(_otpCtrl, 'รหัส OTP 6 หลัก', TextInputType.number),
-              const SizedBox(height: 20),
-              _buildButton(
-                onTap: auth.loading ? null : _verifyOTP,
-                color: sage,
-                icon: Icons.check_circle_outline,
-                label: auth.loading ? 'กำลังตรวจสอบ...' : 'ยืนยัน OTP',
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => setState(() => _otpSent = false),
-                child: const Text('เปลี่ยนเบอร์โทร'),
-              ),
-            ],
-          ]),
+          ),
         ),
       ),
     );
   }
 
-  Widget _field(TextEditingController ctrl, String hint, TextInputType type) =>
-      TextField(
-        controller: ctrl,
-        keyboardType: type,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Color(0xFFAAAAAA)),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFE0E8E0)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFE0E8E0)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF7A9E7E), width: 2),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-      );
+  String? Function(String?) _required(String message) {
+    return (value) =>
+        (value ?? '').trim().isEmpty ? message : null;
+  }
 
-  Widget _buildButton(
-          {required VoidCallback? onTap,
-          required Color color,
-          required IconData icon,
-          required String label}) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: onTap == null ? Colors.grey.shade300 : color,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Sarabun')),
-          ]),
-        ),
-      );
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    TextInputType? keyboardType,
+    bool obscureText = false,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        suffixIcon: suffixIcon,
+      ),
+    );
+  }
 }

@@ -3,6 +3,12 @@ const router  = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { createBookingTransaction } = require('../services/bookingTransaction');
+const {
+  isBookingCancellable,
+  getBangkokDate,
+  dateStringToUtc,
+} = require('../services/bookingPolicy');
 
 function getBangkokNow() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -60,11 +66,16 @@ router.post('/', verifyToken, async (req, res) => {
     return res.status(400).json({ error: 'ช่องทางการจองไม่ถูกต้อง' });
   }
 
-  // ใช้ค่าจองล่วงหน้าจากการตั้งค่าของแอดมิน (ค่าเริ่มต้น 3 วัน)
-  const today    = new Date(); today.setHours(0,0,0,0);
-  const bookDate = new Date(bookingDate);
-  const diffDays = Math.floor((bookDate - today) / 86400000);
   try {
+    // ใช้วันตามเวลาไทยให้ตรงกับวันที่นัดและรอบรีเซ็ตสิทธิ
+    const today = getBangkokNow().date;
+    const todayUtc = dateStringToUtc(today);
+    const bookingDateUtc = dateStringToUtc(bookingDate);
+    if (todayUtc === null || bookingDateUtc === null) {
+      return res.status(400).json({ error: 'รูปแบบวันที่ไม่ถูกต้อง' });
+    }
+    const diffDays = (bookingDateUtc - todayUtc) / 86400000;
+
     const userDoc = await db.collection(COLLECTIONS.USERS).doc(req.user.uid).get();
     const userProfile = userDoc.exists ? userDoc.data() : {};
     const resolvedCustomerName = customerName || userProfile.name || req.user.name || '';
@@ -104,52 +115,20 @@ router.post('/', verifyToken, async (req, res) => {
 
     const bookingId = uuidv4();
 
-    // ใช้ transaction ครอบทั้งการเช็คซ้ำ + ออกเลขคิว + บันทึกการจอง
-    // เพื่อป้องกัน race condition กรณีมีคนจองเวลาเดียวกันพร้อมกัน
-    // (เดิม: เช็คซ้ำอยู่นอก try/catch ทำให้ error จาก Firestore
-    //  ไม่ถูกจับ และอาจทำให้ server ค้าง/ล่มได้)
-    const booking = await db.runTransaction(async (t) => {
-      const staffBookings = await t.get(
-        db.collection(COLLECTIONS.BOOKINGS)
-          .where('bookingDate', '==', bookingDate)
-          .where('staffId', '==', staffId)
-      );
-      const overlaps = staffBookings.docs.some((doc) => {
-        const existing = doc.data();
-        if (!['pending', 'confirmed', 'auto_called', 'in_service'].includes(existing.status)) return false;
-        const [existingHours, existingMinutes] = String(existing.timeSlot || '').split(':').map(Number);
-        const existingStart = existingHours * 60 + existingMinutes;
-        const existingEnd = existingStart + (Number(existing.duration) || 60);
-        return startMinutes < existingEnd && endMinutes > existingStart;
-      });
-      if (overlaps) {
-        throw Object.assign(new Error('เวลานี้ถูกจองแล้ว กรุณาเลือกเวลาอื่น'), { code: 409 });
-      }
-
-      if (healthcareRight !== 'direct') {
-        const sameDayBookings = await t.get(
-          db.collection(COLLECTIONS.BOOKINGS).where('bookingDate', '==', bookingDate)
-        );
-        const rightAlreadyUsed = sameDayBookings.docs.some((doc) => {
-          const existing = doc.data();
-          return existing.nationalId === normalizedNationalId
-            && existing.healthcareRight === healthcareRight
-            && !['cancelled', 'done'].includes(existing.status);
-        });
-        if (rightAlreadyUsed) {
-          throw Object.assign(new Error('สิทธินี้ถูกใช้งานแล้วในวันนี้'), { code: 409 });
-        }
-      }
-
-      const counterRef = db.collection('counters').doc(bookingDate);
-      const counterDoc = await t.get(counterRef);
-      const n = (counterDoc.exists ? counterDoc.data().count : 0) + 1;
-      const queueNumber = `A${String(n).padStart(3, '0')}`;
-      t.set(counterRef, { count: n });
-
-      const newBooking = {
-        id:           bookingId,
-        userId:       req.user.uid,
+    // The shared daily queue counter serializes booking transactions for this date.
+    const booking = await createBookingTransaction({
+      db,
+      bookingId,
+      bookingDate,
+      staffId,
+      startMinutes,
+      endMinutes,
+      healthcareRight,
+      normalizedNationalId,
+      userId: req.user.uid,
+      bookingData: {
+        id: bookingId,
+        userId: req.user.uid,
         customerName: resolvedCustomerName || null,
         customerPhone: resolvedCustomerPhone || null,
         healthcareRight,
@@ -157,19 +136,16 @@ router.post('/', verifyToken, async (req, res) => {
         nationalId: normalizedNationalId || null,
         channel,
         serviceId,
-        serviceName:  service.name || '',
+        serviceName: service.name || '',
         servicePrice: service.price || 0,
         duration,
-        staffId:      staffId || null,
-        staffName:    staffDoc.data().name || '',
+        staffId: staffId || null,
+        staffName: staffDoc.data().name || '',
         bookingDate,
         timeSlot,
-        queueNumber,
-        status:       'pending',   // pending | confirmed | in_service | done | cancelled
-        createdAt:    admin.firestore.FieldValue.serverTimestamp(),
-      };
-      t.set(db.collection(COLLECTIONS.BOOKINGS).doc(bookingId), newBooking);
-      return newBooking;
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
     });
 
     res.status(201).json({ success: true, booking });
@@ -182,14 +158,27 @@ router.post('/', verifyToken, async (req, res) => {
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const ref = db.collection(COLLECTIONS.BOOKINGS).doc(req.params.id);
-    const doc = await ref.get();
+    const result = await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(ref);
+      if (!doc.exists) return { status: 404, error: 'ไม่พบการจอง' };
+      const booking = doc.data();
+      if (booking.userId !== req.user.uid && !req.user.admin) {
+        return { status: 403, error: 'ไม่มีสิทธิ์ยกเลิกการจองนี้' };
+      }
+      if (!isBookingCancellable(booking.status)) {
+        return { status: 409, error: 'ยกเลิกไม่ได้ เนื่องจากคิวเริ่มให้บริการหรือเสร็จสิ้นแล้ว' };
+      }
+      transaction.update(ref, {
+        status: 'cancelled',
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { status: 200 };
+    });
 
-    if (!doc.exists) return res.status(404).json({ error: 'ไม่พบการจอง' });
-    if (doc.data().userId !== req.user.uid && !req.user.admin) {
-      return res.status(403).json({ error: 'ไม่มีสิทธิ์ยกเลิกการจองนี้' });
+    if (result.status !== 200) {
+      return res.status(result.status).json({ error: result.error });
     }
-
-    await ref.update({ status: 'cancelled', cancelledAt: admin.firestore.FieldValue.serverTimestamp() });
     res.json({ success: true, message: 'ยกเลิกการจองสำเร็จ' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -258,7 +247,7 @@ router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
 
 // ── GET /api/bookings/admin/today — Admin: รายการวันนี้ ─────
 router.get('/admin/today', verifyToken, requireAdmin, async (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getBangkokDate();
   try {
     const snap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('bookingDate', '==', today)
@@ -287,6 +276,46 @@ router.get('/admin/today', verifyToken, requireAdmin, async (req, res) => {
         };
       })
       .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/bookings/admin/upcoming — Admin: รายการจองวันถัดไปทั้งหมด ──
+router.get('/admin/upcoming', verifyToken, requireAdmin, async (req, res) => {
+  const today = getBangkokDate();
+  try {
+    const snap = await db.collection(COLLECTIONS.BOOKINGS)
+      .where('bookingDate', '>', today)
+      .get();
+
+    const staffSnap = await db.collection(COLLECTIONS.STAFF).get();
+    const staffById = Object.fromEntries(staffSnap.docs.map((d) => [d.id, d.data()]));
+    const userIds = [...new Set(snap.docs.map((d) => d.data().userId).filter(Boolean))];
+    const userEntries = await Promise.all(userIds.map(async (uid) => {
+      const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
+      return [uid, userDoc.exists ? userDoc.data() : {}];
+    }));
+    const userById = Object.fromEntries(userEntries);
+    const bookings = snap.docs
+      .map((d) => {
+        const booking = { id: d.id, ...d.data() };
+        const user = userById[booking.userId] || {};
+        const staff = staffById[booking.staffId] || {};
+        return {
+          ...booking,
+          customerName: booking.customerName || user.name || '',
+          customerPhone: booking.customerPhone || user.phone || '',
+          staffName: staff.name || booking.staffName || '',
+          healthcareRightLabel: booking.healthcareRightLabel || booking.healthcareRight || 'จ่ายตรง',
+          channel: booking.channel || 'app',
+        };
+      })
+      .sort((a, b) => (
+        String(a.bookingDate || '').localeCompare(String(b.bookingDate || ''))
+        || String(a.timeSlot || '').localeCompare(String(b.timeSlot || ''))
+      ));
     res.json(bookings);
   } catch (err) {
     res.status(500).json({ error: err.message });

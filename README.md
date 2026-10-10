@@ -14,37 +14,62 @@ npm run dev:flutter
 
 # ทดสอบ backend
 npm run test:server
+
+# ทดสอบการจองชนกัน (ต้องติดตั้ง Java สำหรับ Firestore Emulator)
+npm run test:booking-concurrency
 ```
 
 > คำสั่งเหล่านี้ช่วยให้รันจาก root ของโปรเจคได้โดยตรง ไม่ต้องเข้าไปใน subfolder เองทุกครั้ง
-## 🚀 Deploy ไป Render
+> การทดสอบการจองชนกันใช้ Firebase Emulator project แยก ไม่แก้ข้อมูลบน Firebase จริง
+## 🚀 เตรียม Deploy ไป Firebase
 
-```yaml
-# render.yaml
-services:
-  - type: web
-    name: massage-booking-api
-    env: node
-    rootDir: server
-    plan: free
-    buildCommand: npm install
-    startCommand: npm start
-    autoDeploy: true
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 10000
-      - key: FRONTEND_URL
-        value: https://your-app-domain.com
-      - key: APP_URL
-        value: https://your-app-domain.com
+โปรเจกต์นี้กำหนด Firebase project `massage-booking-ce032` พร้อม Hosting สองเว็บ:
+หน้าแอดมิน `massage-booking-ce032` และแอปลูกค้า `massage-booking-customer`.
+คำสั่งด้านล่าง deploy ทั้ง Cloud Functions, Firestore rules/indexes และ Hosting
+แต่จะหยุดเองหากชุดทดสอบหรือ Flutter Web build ไม่ผ่าน
+
+### ตั้งค่าก่อน Deploy (ทำครั้งเดียว)
+
+1. เปิดใช้ Firebase Authentication (Email/Password และ Phone), Firestore, Storage,
+   Cloud Messaging และเปิด Billing plan ที่รองรับ Cloud Scheduler/Cloud Functions
+   สำหรับ worker ที่ทำงานทุก 1 นาที
+   เพิ่ม `massage-booking-ce032.web.app` และ `massage-booking-customer.web.app` ใน
+   Authentication → Settings → Authorized domains ด้วย
+2. สร้างผู้ใช้แอดมินใน Firebase Authentication แล้วกำหนด custom claim `admin: true`
+   ด้วย `node server/scripts/setAdmin.js <อีเมลแอดมิน>`.
+3. สร้างไฟล์ `.env.massage-booking-ce032` ที่ root ของ repository และกำหนด origin
+   ของเว็บที่อนุญาตให้เรียก API:
+
+   ```dotenv
+   FRONTEND_URL=https://massage-booking-ce032.web.app,https://massage-booking-customer.web.app
+   ```
+
+   ไฟล์ `.env.*` ถูกเพิ่มใน ignore rules แล้ว ห้าม commit secret หรือ service-account key
+   เข้า repository.
+4. เปิด Firebase Console → Project settings → Cloud Messaging → Web Push certificates
+   แล้วเตรียม public VAPID key สำหรับ build ของแอปลูกค้า (เป็น public key ไม่ใช่ private key).
+
+### ตรวจสอบและ Deploy
+
+```powershell
+firebase login
+firebase use massage-booking-ce032
+$env:FCM_VAPID_KEY = Read-Host "Paste the Web Push public VAPID key"
+npm run predeploy:firebase
+npm run test:booking-concurrency
+npm audit --omit=dev
+npm run analyze:flutter
+npm run test:flutter
+firebase deploy --only functions,firestore:rules,firestore:indexes,hosting
 ```
 
-> เพิ่มค่าจริงใน Render Dashboard สำหรับ Firebase, ThaiD, Google Sheets, Gmail และ JWT_SECRET ก่อน deploy
+ก่อนปล่อยจริงให้ทดสอบล็อกอิน/จอง/ยกเลิก/แจ้งเตือน/อัปโหลดรูป และยืนยันว่า
+Cloud Scheduler ทำงานได้หลัง deploy; การแจ้งเตือนผ่าน SMS ต้องตั้งค่า Twilio เพิ่ม
+การ deploy เป็นขั้นตอนที่ผู้ดูแลต้องเรียกใช้เอง; การตรวจสอบในเครื่องไม่เปลี่ยน
+ทรัพยากรบน Firebase.
 ## �📝 การแก้ไขล่าสุด (Changelog)
 
-### รอบ 9: เสร็จสมบูรณ์ 100% (Complete & Verified)
+### รอบ 9: ตรวจสอบผ่านในเครื่อง (ยังไม่ได้ Deploy)
 - **Server:**
   - เพิ่ม `require('dotenv').config()` ใน `server/config/firebase.js` ให้โหลด env ได้อย่างมั่นคงในทุกสถานการณ์
   - เพิ่มชุดทดสอบอัตโนมัติ `server/scripts/test_api.js` (รันผ่าน `npm test`) ทดสอบทุก Endpoint พร้อมรายงานผล
@@ -78,7 +103,7 @@ services:
 ### รอบ 8: เปลี่ยนอีโมจิเป็นไอคอนจริง + ใส่โลโก้แอพ
 - **Web-admin:** เพิ่ม Font Awesome → เปลี่ยนไอคอนในเมนู sidebar, ปุ่ม, การ์ดสถิติ, ช่องค้นหา,
   รูปหมอนวด default ทั้งหมดจากอีโมจิเป็นไอคอนชุดเดียวกัน ดูเป็นระเบียบขึ้น
-- **Flutter app:** เปลี่ยนไอคอนปุ่ม ThaiD/OTP, หน้าว่างเปล่า (ไม่มีคิว/ไม่มีประวัติ), badge ยืนยันตัวตน
+- **Flutter app:** ปรับไอคอนหน้าเข้าสู่ระบบ, หน้าว่างเปล่า (ไม่มีคิว/ไม่มีประวัติ), badge ยืนยันตัวตน
   จากอีโมจิเป็น Material Icons
 - **ใส่โลโก้จริง** (ไฟล์ที่ผู้ใช้ส่งมา) แทนอีโมจิ 🌿 เดิม ที่: หน้า splash, หน้า login, header หน้าแรก
   ของแอป, และ sidebar + หน้า login ของ web-admin
@@ -88,53 +113,8 @@ services:
   ข้อมูลต่อรายการที่มาจาก backend จริงๆ (เหมือนให้แอดมินเลือกไอคอนต่อบริการ) ไม่ใช่ปัญหา UI รก —
   ถ้าอยากเปลี่ยนเป็น Material Icons ด้วย บอกได้ แต่ต้องแก้โครงสร้างข้อมูลใน backend ร่วมด้วย
 
-### รอบ 7: ทำให้ใช้กับ ThaiD ของจริงได้ (ไม่ใช่แค่จำลอง)
-
-โค้ด ThaiD flow เดิมเดา endpoint เอง (`/api/v2/oauth2/auth`, `/token`, `/userinfo`) และไม่มี PKCE
-หรือตรวจลายเซ็น ID Token เลย — แก้ใหม่ทั้งหมดให้ตรงตามมาตรฐาน OpenID Connect และอ้างอิงจาก
-[ตัวอย่างทางการของ ETDA (ThaiD-Python-RP)](https://github.com/ETDA/ThaiD-Python-RP):
-
-- **OIDC Discovery** — โหลด endpoint จริงจาก `/.well-known/openid-configuration` แทนการ hardcode path
-  (cache ไว้ 1 ชั่วโมง กันยิงซ้ำทุก request)
-- **PKCE (code_verifier/code_challenge)** — ป้องกันการดัก authorization code ระหว่างทาง
-- **client_secret_basic** — ส่ง client_id/secret ผ่าน HTTP Basic Auth header ตอนแลก token
-  (รูปแบบเดียวกับตัวอย่าง introspect ของ ETDA) ปรับเป็นแบบ post ได้ผ่าน `THAID_TOKEN_AUTH=post`
-- **ตรวจลายเซ็น ID Token ด้วย JWKS** (ไลบรารี `jose`) — สำคัญมาก: ถ้าไม่ตรวจลายเซ็นก่อน
-  ใครก็ปลอม id_token ปลอมข้อมูล pid/name ส่งเข้ามาได้ ตอนนี้ตรวจกับ `jwks_uri`, `issuer`,
-  และ `audience` (= client_id ของเรา) ทุกครั้งก่อนเชื่อข้อมูลในนั้น
-- ทดสอบแล้วด้วย mock OIDC provider จำลองในเครื่อง (ไม่ได้ทดสอบกับ ThaiD จริงเพราะยังไม่มี
-  credentials จริง) — ยืนยันว่า PKCE, Basic auth, และการตรวจ JWKS ทำงานถูกต้องครบ flow
-
-#### วิธีขอ credentials จริงจากกรมการปกครอง
-ThaiD ไม่มี self-service sandbox ให้สมัครเองทางออนไลน์ ต้องติดต่อหน่วยงานโดยตรง:
-1. หน่วยงาน/สถานศึกษาของคุณต้องเป็นผู้ยื่นขอ (ปกติไม่ใช่นักศึกษาคนเดียวสมัครได้เอง)
-2. ติดต่อสำนักบริหารการทะเบียน กรมการปกครอง หรือ ETDA เพื่อขอลงทะเบียนเป็น Relying Party
-3. แจ้ง Redirect URI ที่จะใช้จริง (ต้องตรงกับที่ตั้งใน `.env` เป๊ะๆ) และ scope ที่ต้องการ
-4. เมื่อได้ `client_id`/`client_secret` มาแล้ว ใส่ใน `.env`, ลบ/ปิด `MOCK_THAID`, ปรับ
-   `THAID_SCOPE` ให้ตรงกับที่อนุมัติจริง — ไม่ต้องแก้โค้ดอะไรเพิ่มเติม
-
-### รอบ 6: จำลอง ThaiD login สำหรับพัฒนา/เดโม
-
-**สรุปสั้นๆ:** ThaiD (DOPA Digital ID) ไม่มี public sandbox ให้สมัครใช้เองแบบนักพัฒนาทั่วไป —
-ต้องเป็นหน่วยงาน/นิติบุคคลลงทะเบียนขอ client id/secret กับกรมการปกครองโดยตรง ไม่เหมาะกับ
-โปรเจคจบ/เดโมที่ต้องการทดสอบเร็วๆ จึงเพิ่ม **โหมดจำลอง ThaiD** ในตัวโปรเจคเลย
-
-**วิธีใช้:**
-1. ใน `.env` ตั้ง `MOCK_THAID=true` (ต้อง `NODE_ENV` ไม่ใช่ `production` ด้วย — โหมดนี้ปิดอัตโนมัติ
-   ใน production เสมอ ต่อให้ตั้ง `MOCK_THAID=true` ทิ้งไว้ก็ตาม กันพลาดเปิดโหมดจำลองในของจริง)
-2. รัน server ปกติ (`npm run dev`)
-3. กดปุ่ม "เข้าสู่ระบบด้วย ThaiD" ในแอป (หรือเปิด `http://localhost:3000/api/auth/thaid` ตรงๆ)
-   จะเจอหน้าฟอร์มจำลอง ให้กรอกชื่อ + เลขบัตร 13 หลัก (ไม่ต้องเป็นเลขจริง) แล้วกด "ยินยอมและเข้าสู่ระบบ"
-4. ระบบจะสร้าง Firebase custom token แล้ว login เข้าแอปเหมือน flow จริงทุกประการ
-   (บันทึกลง Firestore, สร้าง session, ไปหน้าถัดไปตามปกติ) — เหมาะสำหรับตอน demo ให้อาจารย์ดู
-
-**เมื่อได้ credentials จริงจาก ThaiD แล้ว:** ลบ/ปิด `MOCK_THAID` ใน `.env` แล้วใส่
-`THAID_CLIENT_ID` / `THAID_CLIENT_SECRET` จริงแทน — โค้ด flow จริงใช้มาตรฐาน OAuth2/OpenID Connect
-เดียวกัน ไม่ต้องแก้อะไรเพิ่ม (อ้างอิงจาก reference implementation ทางการของ ETDA:
-https://github.com/ETDA/ThaiD-Python-RP)
-
-### รอบ 5: Flutter — หน้ากรอกเบอร์โทร (ThaiD) + ระบบแจ้งเตือน/ยืนยัน
-- ผู้ใช้ที่ login ผ่าน ThaiD (ไม่มีเบอร์โทรจาก login) จะเจอหน้า "ขอเบอร์โทรศัพท์" ก่อนเข้าแอป
+### รอบ 5: Flutter — หน้ากรอกเบอร์โทรและระบบแจ้งเตือน/ยืนยัน
+- ผู้ใช้ที่ไม่มีเบอร์โทรในโปรไฟล์จะเจอหน้า "ขอเบอร์โทรศัพท์" ก่อนเข้าแอป
   (`screens/phone_required_screen.dart`) — บันทึกผ่าน `PATCH /api/auth/me`
 - เพิ่มหน้าแจ้งเตือน (`screens/notifications_screen.dart`) เปิดจากไอคอนกระดิ่งที่หน้าแรก
   มี badge ตัวเลขแจ้งเตือนที่ยังไม่ยืนยัน และปุ่ม "รับทราบแล้ว" ต่อรายการ
@@ -152,7 +132,7 @@ https://github.com/ETDA/ThaiD-Python-RP)
 ### รอบ 3: Google Sheets sync + ส่งอีเมลหมอนวด + เบอร์โทรสำรอง + ยืนยันการแจ้งเตือน
 - **Admin:** ปุ่ม "Sync to Google Sheets" — ซิงค์รายการจองทั้งหมดไปที่ Google Sheets (`POST /api/admin/sync-sheets`)
 - **Admin:** ปุ่ม "Email หมอนวด" — ส่งอีเมลแจ้งคิวให้หมอนวดแต่ละคน โดยแยกเฉพาะคิวของตัวเอง ไม่ปนกับคนอื่น (`POST /api/admin/notify-therapists`)
-- **User:** ทุกบัญชีต้องมีเบอร์โทร (ผู้ใช้ ThaiD login ที่ไม่มีเบอร์จะถูกถามเพิ่มหลัง login — ดู `PATCH /api/auth/me`) เพื่อให้แอดมินโทรติดต่อได้เองถ้าแอปแจ้งเตือนไม่ถึง
+- **User:** ทุกบัญชีต้องมีเบอร์โทรในโปรไฟล์เพื่อให้แอดมินติดต่อได้กรณีแอปแจ้งเตือนไม่ถึง
 - **User:** เพิ่มระบบแจ้งเตือน + ปุ่มกดยืนยันว่าเห็นแล้ว (`GET/POST /api/notifications`) — ถ้าผู้ใช้ไม่กดยืนยัน แอดมินจะเห็นสถานะ "ยังไม่ยืนยัน" พร้อมเบอร์โทรใน `GET /api/notifications/admin/all`
 - เพิ่มฟิลด์ `email` ให้หมอนวด (`staff` collection) พร้อม endpoint จัดการ (`POST/PATCH /api/staff`)
 
@@ -182,9 +162,7 @@ https://github.com/ETDA/ThaiD-Python-RP)
 ### รอบ 2: เชื่อม Flutter app เข้ากับ backend จริง
 - `AuthService` เปลี่ยนจาก mock (`Future.delayed` + ข้อมูลปลอม) เป็นของจริง:
   - เข้าสู่ระบบด้วยเบอร์โทร → ใช้ Firebase Phone Auth จริง (`verifyPhoneNumber` / OTP 6 หลัก)
-  - เข้าสู่ระบบด้วย ThaiD → redirect ทั้งหน้าไปที่ `GET /api/auth/thaid` แล้ว server
-    redirect กลับมาพร้อม Firebase custom token ต่อท้าย URL (`?thaid_token=...`)
-    แอปจะอ่านค่านี้ตอนเปิดแอปแล้ว sign in ให้อัตโนมัติ (ดู `services/thaid_web_redirect.dart`)
+  - เข้าสู่ระบบและสมัครสมาชิกด้วยอีเมล/รหัสผ่านผ่าน Firebase Authentication
   - หลัง login สำเร็จจะเรียก `GET /api/auth/me` หรือ `POST /api/auth/register` เพื่อซิงค์โปรไฟล์กับ Firestore จริง
 - `BookingService` เปลี่ยนจาก mock ในหน่วยความจำ เป็นเรียก backend จริงทั้งหมด
   (`GET /api/services`, `GET/POST/DELETE /api/bookings`, `GET /api/queue/my`)
@@ -193,20 +171,14 @@ https://github.com/ETDA/ThaiD-Python-RP)
   `flutter run --dart-define=API_BASE_URL=http://192.168.x.x:3000/api` ตอน dev)
 - เพิ่ม `lib/firebase_options.dart` (placeholder) — **ต้องรัน `flutterfire configure` ก่อนใช้งานจริง**
   ไม่งั้น `Firebase.initializeApp()` จะ error เพราะเป็นค่า YOUR_API_KEY ปลอม
-- แก้ `.env.example`: `THAID_REDIRECT_URI` เดิมขาด `/api` prefix (route จริง mount ที่ `/api/auth/...`)
-- เพิ่ม `APP_URL` ใน `.env.example` — ใช้ตอน redirect กลับหลัง ThaiD login สำเร็จ
-
-**ข้อจำกัดที่ควรรู้:** ThaiD OAuth ต้องใช้ client id/secret จริงจากกรมการปกครอง ซึ่งปกติ
-นักศึกษาจะยังไม่มี (ต้องขอผ่านหน่วยงาน) — โค้ดฝั่ง server/app เชื่อมต่อไว้ถูกต้องตามสเปคแล้ว
-แต่จะทดสอบ end-to-end ได้จริงก็ต่อเมื่อมี ThaiD sandbox credentials เท่านั้น
-ส่วนเบอร์โทร (Firebase Phone Auth) ทดสอบได้ทันทีถ้าตั้งค่า Firebase project จริงแล้ว
+**ข้อควรรู้:** การเข้าสู่ระบบใช้ Firebase Authentication (อีเมล/รหัสผ่านหรือเบอร์โทร/OTP)
+ต้องเปิด provider ที่ใช้ใน Firebase Console และตั้งค่าโดเมนที่อนุญาตก่อนทดสอบจริง
 
 ### รอบ 1: แก้บั๊ก server
 
 - แก้ปัญหา unhandled promise ใน `POST /api/bookings` และเปลี่ยนไปใช้ Firestore transaction
   เพื่อป้องกันการจองซ้ำเวลาเดียวกันพร้อมกัน (race condition)
 - แก้ catch-all route ใน `server/index.js` ไม่ให้ตอบ HTML กลับไปเมื่อยิง `/api/*` ที่ไม่มีจริง (ตอบ JSON 404 แทน) และเพิ่ม global error handler
-- แก้ช่องโหว่ CSRF ใน ThaiD OAuth login โดยตรวจสอบค่า `state` ตอน callback
 - เพิ่ม `firestore.indexes.json` และ `firebase.json` สำหรับ composite index ที่ query ต้องใช้ (ไม่มีมาก่อนจะทำให้ query ล้มเหลวตอน production)
 - ล้างไฟล์ที่ไม่ควรอยู่ใน repo ออก (`.dart_tool/`, `build/`, `.idea/`, Chrome profile cache ที่ติดมากับ zip ~20MB+)
 - **ที่ยังไม่ได้แก้ (รู้ไว้ก่อน):** `AuthService` และ `BookingService` ฝั่ง Flutter ยังเป็น mock data (`Future.delayed` + ข้อมูลปลอม) ไม่ได้เรียก backend จริง — ฝั่ง web-admin เชื่อมกับ API จริงแล้ว
@@ -224,7 +196,7 @@ https://github.com/ETDA/ThaiD-Python-RP)
 |---------|-----------|
 | Mobile App | **Flutter** |
 | Database | **Firebase** (Firestore + Authentication) |
-| ยืนยันตัวตน | **ThaiD API** |
+| ยืนยันตัวตน | **Firebase Authentication (อีเมล/รหัสผ่าน หรือเบอร์โทร/OTP)** |
 | Web Admin | **HTML, CSS, JavaScript** |
 | Server | **Node.js + Express** |
 | Editor | Visual Studio Code |
@@ -239,7 +211,7 @@ massage-booking/
 │   ├── config/firebase.js     → Firebase Admin SDK config
 │   ├── middleware/auth.js     → JWT/Firebase token verification
 │   ├── routes/
-│   │   ├── auth.js            → ThaiD login + phone register
+│   │   ├── auth.js            → phone profile registration
 │   │   ├── bookings.js        → CRUD การจอง
 │   │   ├── queue.js           → จัดการคิว real-time
 │   │   ├── services.js        → รายการบริการ
@@ -283,11 +255,13 @@ massage-booking/
 
 ### 1️⃣ ตั้งค่า Firebase
 
-1. สร้างโปรเจคที่ [Firebase Console](czzzz
-2. เปิดใช้งาน **Authentication** → Phone + Custom Token
+1. สร้างโปรเจคที่ [Firebase Console](https://console.firebase.google.com/)
+2. เปิดใช้งาน **Authentication** → Email/Password และ Phone
 3. เปิดใช้งาน **Firestore Database**
-4. ไปที่ Project Settings → Service Accounts → **Generate new private key**
-   ดาวน์โหลดไฟล์ `serviceAccountKey.json`
+4. เปิดใช้งาน **Storage** และตรวจสอบ bucket name ในหน้า Storage
+5. สำหรับการรันในเครื่อง ตั้งค่า Firebase Admin credentials ใน `server/.env`.
+   บน Firebase Cloud Functions ให้ใช้ service identity/Application Default Credentials
+   และอย่านำไฟล์ private key เข้า source control หรือใส่ใน deployment bundle
 
 ### 2️⃣ ตั้งค่า Server (Node.js + Express)
 
@@ -295,7 +269,8 @@ massage-booking/
 cd server
 npm install
 cp .env.example .env
-# แก้ไข .env ใส่ค่า Firebase + ThaiD ของจริง
+# แก้ไข .env ใส่ค่า Firebase Admin SDK ของจริง
+# ตั้ง FIREBASE_STORAGE_BUCKET ให้ตรงกับชื่อ bucket ใน Firebase Storage
 
 # วางไฟล์ serviceAccountKey.json (ถ้าจะใช้วิธีไฟล์แทน .env)
 
@@ -305,6 +280,8 @@ npm run dev      # หรือ npm start
 Server จะรันที่ `http://localhost:3000`
 - API: `http://localhost:3000/api`
 - Web Admin: `http://localhost:3000` (เสิร์ฟไฟล์ static อัตโนมัติ)
+
+การอัปโหลดรูปหมอนวดใช้ Firebase Admin SDK ผ่าน API และรองรับ JPG, PNG, WebP ขนาดไม่เกิน 5 MB บัญชี Service Account ของ Server ต้องมีสิทธิ์เขียน Firebase Storage objects
 
 ### 3️⃣ เพิ่มข้อมูลตัวอย่าง (บริการ + หมอนวด)
 
@@ -343,23 +320,17 @@ flutter run
 
 > ต้องวาง `google-services.json` (Android) และ `GoogleService-Info.plist` (iOS) ตามที่ flutterfire configure สร้างให้
 
-### 6️⃣ ตั้งค่า ThaiD API
-
-1. สมัครใช้งานที่ [ThaiD Developer Portal](https://www.dopa.go.th) (กรมการปกครอง)
-2. ขอ `client_id` / `client_secret`
-3. ตั้งค่า redirect URI ให้ตรงกับ `.env` → `THAID_REDIRECT_URI`
-4. ใส่ค่าใน `server/.env`
-
 ---
 
 ## ✨ ฟีเจอร์ตามขอบเขตระบบ
 
 ### Mobile App (Flutter)
-- [x] สมัครสมาชิก / Login (รองรับ ThaiD + เบอร์โทร)
+- [x] สมัครสมาชิก / Login ด้วยอีเมล/รหัสผ่าน หรือเบอร์โทร/OTP
 - [x] จองคิวล่วงหน้า (ไม่เกิน 3 วัน)
+- [x] สิทธิบัตรทอง/ประกันสังคม: เลขบัตรและสิทธิเดียวกันจองได้วันละ 1 ครั้ง (ยกเลิกแล้วจองใหม่ได้; จ่ายตรงไม่จำกัด)
 - [x] ดูลำดับคิว แบบ real-time
 - [x] ประวัติการจอง
-- [ ] รับแจ้งเตือนก่อนถึงเวลา (ต้องตั้งค่า Firebase Cloud Messaging เพิ่ม)
+- [x] ระบบแจ้งเตือนก่อนนัด 15 นาที และเปลี่ยนสถานะเป็น “กำลังให้บริการ” เมื่อถึงเวลานัด (worker ตรวจทุก 1 นาที; การส่ง Push/SMS ขึ้นกับการตั้งค่าผู้ให้บริการ)
 
 ### Web Admin
 - [x] Dashboard สรุปภาพรวม + กราฟแนวโน้ม
@@ -373,6 +344,6 @@ flutter run
 ## 📌 หมายเหตุสำคัญ
 
 - โค้ดชุดนี้คือ **โครงสร้างโปรเจคที่พร้อมพัฒนาต่อ (scaffold)** ใช้เทคโนโลยีตรงตามเอกสารที่กำหนด
-- ต้องเชื่อมต่อ Firebase project จริงและขอ ThaiD API key ก่อนใช้งานจริง
+- ต้องเชื่อมต่อ Firebase project จริงและเปิด Authentication providers ที่เลือกใช้ก่อนใช้งานจริง
 - Web Admin มี fallback ข้อมูลตัวอย่างในตัว เพื่อให้ทดสอบ UI ได้ทันทีแม้ backend ยังไม่ตั้งค่าเสร็จ
 - Flutter app ต้องรัน `flutter pub get` และตั้งค่า Firebase ผ่าน `flutterfire configure` ก่อนใช้งาน

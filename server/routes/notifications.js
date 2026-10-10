@@ -4,7 +4,7 @@ const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser } = require('./fcm');
 const { sendSms } = require('../services/sms');
-const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue } = require('../services/firestoreGuard');
+const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue, deleteCachedValue } = require('../services/firestoreGuard');
 
 // ── GET /api/notifications — แจ้งเตือนของผู้ใช้ที่ login อยู่ ──────
 router.get('/', verifyToken, async (req, res) => {
@@ -37,20 +37,49 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// ── POST /api/notifications/:id/confirm — ผู้ใช้กดยืนยันว่าเห็นการแจ้งเตือนแล้ว
+// ── POST /api/notifications/:id/confirm — ผู้ใช้รับทราบหรือยืนยันว่ามาถึงตามเวลานัด
 // ส่งผลกลับไปให้แอดมินเห็นสถานะนี้ผ่าน GET /api/notifications/admin/all
 router.post('/:id/confirm', verifyToken, async (req, res) => {
   try {
     const ref = db.collection(COLLECTIONS.NOTIFICATIONS).doc(req.params.id);
-    const doc = await ref.get();
-    if (!doc.exists) return res.status(404).json({ error: 'ไม่พบการแจ้งเตือนนี้' });
-    if (doc.data().userId !== req.user.uid) {
-      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึงการแจ้งเตือนนี้' });
-    }
-    await ref.update({
-      confirmed:   true,
-      confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+    const result = await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(ref);
+      if (!doc.exists) return { status: 404, error: 'ไม่พบการแจ้งเตือนนี้' };
+      const notification = doc.data();
+      if (notification.userId !== req.user.uid) {
+        return { status: 403, error: 'ไม่มีสิทธิ์เข้าถึงการแจ้งเตือนนี้' };
+      }
+      const bookingRef = notification.bookingId
+        ? db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId)
+        : null;
+      const bookingDoc = bookingRef ? await transaction.get(bookingRef) : null;
+      if (notification.type === 'appointment_due' && bookingDoc?.exists) {
+        const booking = bookingDoc.data();
+        const appointment = new Date(`${booking.bookingDate}T${booking.timeSlot}:00+07:00`);
+        const graceEndsAt = appointment.getTime() + 5 * 60 * 1000;
+        if (
+          booking.status === 'cancelled' ||
+          !Number.isFinite(appointment.getTime()) ||
+          Date.now() > graceEndsAt
+        ) {
+          return { status: 409, error: 'หมดเวลายืนยันการมาถึงแล้ว' };
+        }
+      }
+      transaction.update(ref, {
+        confirmed: true,
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      if (bookingRef && bookingDoc?.exists && notification.type === 'appointment_due') {
+        transaction.update(bookingRef, {
+          customerConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      return { status: 200 };
     });
+    if (result.status !== 200) return res.status(result.status).json({ error: result.error });
+    deleteCachedValue(`notifications:${req.user.uid}`);
+    deleteCachedValue('notifications:admin');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -69,7 +98,11 @@ router.post('/:id/resend', verifyToken, requireAdmin, async (req, res) => {
       ? await db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId).get()
       : null;
     const booking = bookingDoc?.exists ? bookingDoc.data() : {};
-    await createNotification({ userId: notification.userId, bookingId: notification.bookingId, message });
+    await notificationRef.update({
+      lastResentAt: admin.firestore.FieldValue.serverTimestamp(),
+      resendCount: admin.firestore.FieldValue.increment(1),
+    });
+    deleteCachedValue('notifications:admin');
     sendPushToUser(notification.userId, 'แจ้งเตือนจากศูนย์บริการ', message, {
       bookingId: notification.bookingId || '',
       type: 'notification_resend',
@@ -85,21 +118,38 @@ router.post('/:id/resend', verifyToken, requireAdmin, async (req, res) => {
 router.post('/:id/admin-confirm', verifyToken, requireAdmin, async (req, res) => {
   try {
     const notificationRef = db.collection(COLLECTIONS.NOTIFICATIONS).doc(req.params.id);
-    const notificationDoc = await notificationRef.get();
-    if (!notificationDoc.exists) return res.status(404).json({ error: 'ไม่พบการแจ้งเตือนนี้' });
-    const notification = notificationDoc.data();
-    await notificationRef.update({
-      confirmed: true,
-      confirmedByAdmin: true,
-      confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    if (notification.bookingId) {
-      await db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId).update({
-        status: 'confirmed',
+    const result = await db.runTransaction(async (transaction) => {
+      const notificationDoc = await transaction.get(notificationRef);
+      if (!notificationDoc.exists) return { status: 404, error: 'ไม่พบการแจ้งเตือนนี้' };
+      const notification = notificationDoc.data();
+      const bookingRef = notification.bookingId
+        ? db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId)
+        : null;
+      const bookingDoc = bookingRef ? await transaction.get(bookingRef) : null;
+      if (
+        bookingDoc?.exists &&
+        ['cancelled', 'done'].includes(bookingDoc.data().status)
+      ) {
+        return { status: 409, error: 'คิวนี้ปิดรายการแล้ว' };
+      }
+      transaction.update(notificationRef, {
+        confirmed: true,
         confirmedByAdmin: true,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-    }
+      if (bookingRef && bookingDoc?.exists) {
+        const bookingUpdate = {
+          customerConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+          confirmedByAdmin: true,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        if (bookingDoc.data().status !== 'in_service') bookingUpdate.status = 'confirmed';
+        transaction.update(bookingRef, bookingUpdate);
+      }
+      return { status: 200 };
+    });
+    if (result.status !== 200) return res.status(result.status).json({ error: result.error });
+    deleteCachedValue('notifications:admin');
     res.json({ success: true, message: 'ยืนยันคิวแล้ว' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -132,8 +182,7 @@ router.post('/:id/admin-cancel', verifyToken, requireAdmin, async (req, res) => 
   }
 });
 
-// ── GET /api/notifications/admin/all — แอดมิน: ดูว่าใครยังไม่กดยืนยัน ──
-// ใช้เบอร์โทรลูกค้าโทรติดต่อเองกรณีแอปแจ้งเตือนไม่ถึง (ตามที่ระบุในสเปค)
+// ── GET /api/notifications/admin/all — แอดมิน: ดูสถานะการแจ้งเตือน ──
 router.get('/admin/all', verifyToken, requireAdmin, async (req, res) => {
   const cacheKey = 'notifications:admin';
   const cached = getCachedValue(cacheKey, 120_000);
@@ -183,6 +232,7 @@ router.get('/admin/all', verifyToken, requireAdmin, async (req, res) => {
       customerPhone: bookingById[n.bookingId]?.customerPhone || userById[n.userId]?.phone || '',
       queueNumber:   bookingById[n.bookingId]?.queueNumber || '',
       bookingStatus: bookingById[n.bookingId]?.status || '',
+      customerConfirmedAt: bookingById[n.bookingId]?.customerConfirmedAt || null,
     }));
     setCachedValue(cacheKey, result, 120_000);
     res.json(result);
@@ -198,14 +248,17 @@ router.get('/admin/all', verifyToken, requireAdmin, async (req, res) => {
 
 // ── Helper (ใช้จากไฟล์อื่น เช่น queue.js ตอนเรียกคิว) ────────────
 // สร้าง notification ให้ผู้ใช้คนหนึ่ง ไม่ผ่าน HTTP — เรียกตรงจาก route อื่น
-async function createNotification({ userId, bookingId, message }) {
+async function createNotification({ userId, bookingId, message, type = 'general' }) {
   await db.collection(COLLECTIONS.NOTIFICATIONS).add({
     userId,
     bookingId,
     message,
+    type,
     confirmed: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  deleteCachedValue(`notifications:${userId}`);
+  deleteCachedValue('notifications:admin');
 }
 
 module.exports = router;

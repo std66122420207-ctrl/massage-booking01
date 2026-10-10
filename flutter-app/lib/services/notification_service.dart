@@ -9,6 +9,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class NotificationService {
+  static const _webVapidKey = String.fromEnvironment('FCM_VAPID_KEY');
+
   static Future<void> init({VoidCallback? onMessageReceived}) async {
     // ขอสิทธิ์แจ้งเตือนจากผู้ใช้
     FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -23,13 +25,21 @@ class NotificationService {
     );
 
     debugPrint('User granted permission: ${settings.authorizationStatus}');
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      return;
+    }
 
     // ดึง FCM token
     String? token;
     try {
       if (kIsWeb) {
-        token = await messaging.getToken(
-            vapidKey: 'YOUR_VAPID_KEY_HERE'); // ใส่ vapidKey ในภายหลัง
+        if (_webVapidKey.isEmpty) {
+          debugPrint(
+            'Web push is disabled: provide FCM_VAPID_KEY using --dart-define.',
+          );
+        } else {
+          token = await messaging.getToken(vapidKey: _webVapidKey);
+        }
       } else {
         token = await messaging.getToken();
       }
@@ -43,9 +53,11 @@ class NotificationService {
     }
 
     // อัพเดท token ใหม่เมื่อมีการเปลี่ยน
-    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-      _saveTokenToBackend(newToken);
-    });
+    if (!kIsWeb || _webVapidKey.isNotEmpty) {
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        _saveTokenToBackend(newToken);
+      });
+    }
 
     // ฟังข้อความเมื่อแอปทำงานอยู่เบื้องหน้า
     FirebaseMessaging.onMessage.listen((message) {
@@ -74,7 +86,13 @@ class NotificationService {
 
   static Future<void> removeToken() async {
     try {
-      String? token = await FirebaseMessaging.instance.getToken();
+      final token = kIsWeb
+          ? (_webVapidKey.isEmpty
+              ? null
+              : await FirebaseMessaging.instance.getToken(
+                  vapidKey: _webVapidKey,
+                ))
+          : await FirebaseMessaging.instance.getToken();
       if (token != null) {
         await ApiClient.delete('/fcm/token', {'token': token});
       }

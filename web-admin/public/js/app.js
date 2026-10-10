@@ -6,8 +6,16 @@
 let services = [];
 let staffList = [];
 let bookings = [];
+let upcomingBookings = [];
 let bookingSearch = '';
 let queueStatus = { currentQueue: null };
+const bangkokDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+let selectedQueueDate = '';
 
 const STATUS_LABEL = {
   pending:    'รอยืนยัน',
@@ -25,6 +33,7 @@ const STATUS_BADGE = {
   done:       'badge-green',
   cancelled:  'badge-red',
 };
+const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'auto_called'];
 
 // ── Auth: login / logout / gate ──────────────────────────────
 const loginScreen = document.getElementById('login-screen');
@@ -100,7 +109,10 @@ function showPage(id) {
   };
   document.getElementById('page-title').textContent = titles[id] || '';
 
-  if (id === 'queue') renderQueuePage();
+  if (id === 'queue') {
+    loadBookings();
+    loadUpcomingBookings();
+  }
 }
 
 document.querySelectorAll('.sidebar-item').forEach(btn => {
@@ -194,16 +206,17 @@ const staffPhotoInput   = document.getElementById('staff-modal-photo');
 
 async function uploadStaffImage(file) {
   if (!file) return null;
-
-  const storage = firebase.storage();
-  const timestamp = Date.now();
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const storageRef = storage.ref(`staff-photos/${timestamp}_${safeName}`);
-
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error('รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP');
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('รูปภาพต้องมีขนาดไม่เกิน 5 MB');
+  }
   try {
-    const snapshot = await storageRef.put(file);
-    const downloadUrl = await snapshot.ref.getDownloadURL();
-    return downloadUrl;
+    const { url } = await API.uploadStaffPhoto(file);
+    if (!url) throw new Error('เซิร์ฟเวอร์ไม่ได้ส่ง URL ของรูปกลับมา');
+    return url;
   } catch (err) {
     throw new Error(`อัปโหลดรูปไม่สำเร็จ: ${err.message || 'กรุณาลองใหม่'}`);
   }
@@ -305,30 +318,43 @@ staffModalForm.addEventListener('submit', async (e) => {
 });
 
 async function loadBookings() {
-  try {
-    const [todayBookings, currentQueue] = await Promise.all([
+  const [todayResult, queueResult] = await Promise.allSettled([
       API.getTodayBookings(),
       API.getQueueStatus(),
-    ]);
-    bookings = todayBookings;
-    queueStatus = currentQueue || { currentQueue: null };
-  } catch (err) {
+  ]);
+  if (todayResult.status === 'fulfilled' && queueResult.status === 'fulfilled') {
+    bookings = todayResult.value;
+    queueStatus = queueResult.value || { currentQueue: null };
+  } else {
+    const err = todayResult.status === 'rejected' ? todayResult.reason : queueResult.reason;
     bookings = [];
     queueStatus = { currentQueue: null };
     noteOfflineFallback();
     showToast(`โหลดการจองไม่สำเร็จ: ${err.message}`);
   }
-
   renderBookingsTable();
   renderDashboardStats();
   renderQueuePage();
+  renderUpcomingBookings();
+}
+
+async function loadUpcomingBookings() {
+  try {
+    upcomingBookings = await API.getUpcomingBookings();
+  } catch (err) {
+    upcomingBookings = [];
+    showToast(`โหลดรายการจองล่วงหน้าไม่สำเร็จ: ${err.message}`);
+  }
+  renderUpcomingBookings();
 }
 
 // ── Dashboard ───────────────────────────────────────────────
 function renderDashboardStats() {
   const total   = bookings.length;
-  const waiting = bookings.filter(b => ['pending', 'confirmed'].includes(b.status)).length;
+  const waiting = bookings.filter(b => ['pending', 'confirmed', 'auto_called'].includes(b.status)).length;
+  const inService = bookings.filter(b => b.status === 'in_service').length;
   const done    = bookings.filter(b => b.status === 'done').length;
+  const cancelled = bookings.filter(b => b.status === 'cancelled').length;
   const revenue = bookings.filter(b => b.status === 'done')
                           .reduce((sum, b) => sum + (b.servicePrice || 0), 0);
   const current = bookings.find(b => b.queueNumber === queueStatus.currentQueue)
@@ -338,32 +364,56 @@ function renderDashboardStats() {
   document.getElementById('stat-waiting').textContent = waiting;
   document.getElementById('stat-done').textContent    = done;
   document.getElementById('stat-revenue').textContent = revenue.toLocaleString();
-  document.getElementById('stat-current').textContent = current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
-    document.getElementById('stat-current').textContent = queueStatus.currentQueue
-      ? `กำลังให้บริการ: ${queueStatus.currentQueue}`
-      : current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
+  document.getElementById('stat-current').textContent = queueStatus.currentQueue
+    ? `กำลังให้บริการ: ${queueStatus.currentQueue}`
+    : current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
   document.getElementById('stat-staff-count').textContent = staffList.length;
 
-  buildTrendChart();
+  const dateEl = document.getElementById('dashboard-date');
+  if (dateEl) {
+    dateEl.textContent = new Intl.DateTimeFormat('th-TH', {
+      timeZone: 'Asia/Bangkok',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date());
+  }
+  document.getElementById('dashboard-queue-total').textContent = total;
+  document.getElementById('dashboard-waiting-count').textContent = waiting;
+  document.getElementById('dashboard-service-count').textContent = inService;
+  document.getElementById('dashboard-done-count').textContent = done;
+  document.getElementById('dashboard-cancelled-count').textContent = cancelled;
+  const denominator = Math.max(total, 1);
+  document.getElementById('dashboard-waiting-bar').style.width = `${waiting / denominator * 100}%`;
+  document.getElementById('dashboard-service-bar').style.width = `${inService / denominator * 100}%`;
+  document.getElementById('dashboard-done-bar').style.width = `${done / denominator * 100}%`;
+  document.getElementById('dashboard-cancelled-bar').style.width = `${cancelled / denominator * 100}%`;
+  renderDashboardBookings();
 }
 
-function buildTrendChart() {
-  const vals = [0, 0, 0, 0, 0, 0, bookings.length];
-  const days = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
-  const max  = Math.max(...vals, 1);
-  const wrap = document.getElementById('trend-chart');
-  wrap.innerHTML = vals.map((v, i) => `
-    <div class="bar-wrap">
-      <div class="bar" style="height:${(v / max * 100)}%"></div>
-      <div class="bar-label">${days[i]}</div>
-    </div>
-  `).join('');
+function renderDashboardBookings() {
+  const tbody = document.getElementById('dashboard-bookings-tbody');
+  if (!tbody) return;
+  const list = bookings;
+  document.getElementById('dashboard-bookings-count').textContent = `${list.length} รายการ`;
+  tbody.innerHTML = list.map(b => `
+    <tr>
+      <td class="queue-id">${b.queueNumber || '-'}</td>
+      <td>${b.timeSlot || '-'}</td>
+      <td>${b.customerName || b.userName || '-'}</td>
+      <td>${b.customerPhone || '-'}</td>
+      <td>${b.serviceName || '-'}</td>
+      <td>${b.staffName || '-'}</td>
+      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
 }
 
 // ── Bookings Table ──────────────────────────────────────────
 function renderBookingsTable() {
   const tbody = document.getElementById('bookings-tbody');
-  const list = bookings.filter(matchesBookingSearch);
+  const list = bookings;
 
   document.getElementById('bookings-count').textContent = `${list.length} รายการ`;
 
@@ -379,14 +429,47 @@ function renderBookingsTable() {
       <td>${b.staffName || '-'}</td>
       <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
       <td>
-        ${b.status !== 'cancelled' && b.status !== 'done' ? `
-          <button class="action-btn btn-done" onclick="markDone('${b.id}')">เสร็จ</button>
-          <button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>
-        ` : ''}
+        ${b.status === 'in_service' ? `<button class="action-btn btn-done" onclick="markDone('${b.id}')">เสร็จ</button>` : ''}
+        ${CANCELLABLE_STATUSES.includes(b.status) ? `<button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>` : ''}
       </td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
 }
+
+function renderUpcomingBookings() {
+  const tbody = document.getElementById('upcoming-bookings-tbody');
+  if (!tbody) return;
+  const list = upcomingBookings
+    .filter(matchesBookingSearch)
+    .filter(b => !selectedQueueDate || b.bookingDate === selectedQueueDate);
+  document.getElementById('upcoming-bookings-count').textContent = `${list.length} รายการ`;
+  tbody.innerHTML = list.map(b => `
+    <tr>
+      <td>${b.bookingDate || '-'}</td>
+      <td class="queue-id">${b.queueNumber || '-'}</td>
+      <td>${b.timeSlot || '-'}</td>
+      <td>${b.customerName || b.userName || '-'}</td>
+      <td>${b.customerPhone || '-'}</td>
+      <td>${b.serviceName || '-'}</td>
+      <td>${b.staffName || '-'}</td>
+      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
+      <td>${CANCELLABLE_STATUSES.includes(b.status)
+        ? `<button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>`
+        : ''}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--slate);padding:24px">ไม่มีรายการจองในวันที่เลือก</td></tr>';
+}
+
+document.getElementById('queue-date-filter')?.addEventListener('change', event => {
+  selectedQueueDate = event.target.value;
+  renderUpcomingBookings();
+});
+document.getElementById('queue-date-clear')?.addEventListener('click', () => {
+  selectedQueueDate = '';
+  document.getElementById('queue-date-filter').value = '';
+  renderUpcomingBookings();
+});
+document.getElementById('queue-upcoming-refresh')?.addEventListener('click', loadUpcomingBookings);
 
 async function markDone(id) {
   try {
@@ -400,6 +483,7 @@ async function cancelBooking(id) {
   try {
     await API.cancelBooking(id);
     await loadBookings();
+    await loadUpcomingBookings();
     showToast('ยกเลิกการจองแล้ว');
   } catch (err) { showToast(`ยกเลิกไม่สำเร็จ: ${err.message}`); }
 }
@@ -436,12 +520,12 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
 
 // ── Queue Page ──────────────────────────────────────────────
 function renderQueuePage() {
-  const list = bookings.filter(matchesBookingSearch);
-  const current  = list.find(b => b.queueNumber === queueStatus.currentQueue)
-    || list.find(b => b.status === 'in_service');
-  const waiting  = list.filter(b => ['pending', 'confirmed', 'auto_called'].includes(b.status))
+  const current  = bookings.find(b => b.queueNumber === queueStatus.currentQueue)
+    || bookings.find(b => b.status === 'in_service');
+  const allWaiting = bookings.filter(b => ['pending', 'confirmed', 'auto_called'].includes(b.status))
     .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
-  const done     = list.filter(b => b.status === 'done');
+  const done     = bookings.filter(b => b.status === 'done');
+  const waiting = allWaiting.filter(matchesBookingSearch);
 
   document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
   document.getElementById('queue-current-details').innerHTML = current
@@ -478,10 +562,10 @@ function matchesBookingSearch(booking) {
   return value.includes(bookingSearch);
 }
 
-document.querySelector('.search-box')?.addEventListener('input', (event) => {
+document.getElementById('queue-search')?.addEventListener('input', (event) => {
   bookingSearch = event.target.value.trim().toLowerCase();
-  renderBookingsTable();
   renderQueuePage();
+  renderUpcomingBookings();
 });
 
 async function callSpecific(id) {
@@ -519,26 +603,40 @@ async function loadNotifications() {
 }
 
 function renderNotifications(list) {
-  const pending = list.filter(n => !n.confirmed);
+  const pending = list.filter(n => !n.confirmed && !['cancelled', 'done'].includes(n.bookingStatus));
   document.getElementById('notif-pending-count').textContent = `${pending.length} คนยังไม่ยืนยัน`;
   const statEl = document.getElementById('stat-notif-pending');
   if (statEl) statEl.textContent = pending.length;
 
-  document.getElementById('notif-tbody').innerHTML = list.slice(0, 20).map(n => `
-    <tr>
-      <td>${n.message || '-'}</td>
-      <td>${n.customerName || '-'}${n.queueNumber ? `<br><small class="queue-id">${n.queueNumber}</small>` : ''}</td>
-      <td>${n.customerPhone || '-'}</td>
-      <td>${n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH') : '-'}</td>
-      <td><span class="badge ${n.confirmed ? 'badge-green' : 'badge-yellow'}">${n.confirmed ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}</span></td>
-      <td>
-        ${n.customerPhone ? `<a class="action-btn btn-call" href="tel:${n.customerPhone}"><i class="fa-solid fa-phone"></i> โทร</a>` : ''}
-        ${!n.confirmed ? `<button class="action-btn btn-done" onclick="confirmNotificationByAdmin('${n.id}')"><i class="fa-solid fa-check"></i> ยืนยันคิว</button>` : ''}
-        ${!n.confirmed ? `<button class="action-btn btn-cancel" onclick="cancelNotificationBooking('${n.id}')"><i class="fa-solid fa-xmark"></i> ยกเลิกคิว</button>` : ''}
-        ${!n.confirmed ? `<button class="action-btn btn-edit" onclick="resendNotification('${n.id}')"><i class="fa-solid fa-paper-plane"></i> ส่งซ้ำ</button>` : ''}
-      </td>
-    </tr>
-  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--slate)">ยังไม่มีการแจ้งเตือน</td></tr>';
+  document.getElementById('notif-tbody').innerHTML = list.slice(0, 20).map(n => {
+    const closed = ['cancelled', 'done'].includes(n.bookingStatus);
+    const statusLabel = n.bookingStatus === 'cancelled'
+      ? 'คิวถูกยกเลิก'
+      : n.bookingStatus === 'done'
+        ? 'เสร็จสิ้น'
+        : n.confirmed ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน';
+    const statusClass = n.bookingStatus === 'cancelled'
+      ? 'badge-red'
+      : n.bookingStatus === 'done'
+        ? 'badge-gray'
+        : n.confirmed ? 'badge-green' : 'badge-yellow';
+    return `
+      <tr>
+        <td>${n.message || '-'}</td>
+        <td>${n.customerName || '-'}${n.queueNumber ? `<br><small class="queue-id">${n.queueNumber}</small>` : ''}</td>
+        <td>${n.customerPhone || '-'}</td>
+        <td>${n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH') : '-'}</td>
+        <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+        <td>
+          ${!n.confirmed && !closed
+            ? `<button class="action-btn btn-call" onclick="resendNotification('${n.id}')"><i class="fa-solid fa-bell"></i> แจ้งเตือนอีกครั้ง</button>
+              <button class="action-btn btn-done" onclick="confirmNotificationByAdmin('${n.id}')"><i class="fa-solid fa-check"></i> ยืนยันคิว</button>
+              <button class="action-btn btn-cancel" onclick="cancelNotificationBooking('${n.id}')"><i class="fa-solid fa-xmark"></i> ยกเลิกคิว</button>`
+            : '<span style="color:var(--slate-light)">-</span>'}
+        </td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--slate)">ยังไม่มีการแจ้งเตือน</td></tr>';
 }
 
 async function resendNotification(id) {
@@ -571,43 +669,6 @@ async function cancelNotificationBooking(id) {
     showToast(`ยกเลิกคิวไม่สำเร็จ: ${err.message}`);
   }
 }
-
-// ── Google Sheets sync ──────────────────────────────────────
-document.getElementById('btn-sync-sheets').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-sync-sheets');
-  btn.disabled = true; btn.textContent = '⏳ กำลังซิงค์...';
-  try {
-    const res = await API.syncSheets();
-    if (res.error) throw new Error(res.error);
-    showToast(`ซิงค์ข้อมูลไป Google Sheets แล้ว (${res.syncedCount ?? 0} แถว) ✓`);
-  } catch (err) {
-    showToast(`❌ ซิงค์ไม่สำเร็จ: ${err.message}`);
-  } finally {
-    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-table-cells"></i> Sync to Google Sheets';
-  }
-});
-
-// ── ส่งอีเมลคิวให้หมอนวดแต่ละคน (แยกเคสของแต่ละคน) ───────────
-document.getElementById('btn-notify-therapists').addEventListener('click', async () => {
-  const btn = document.getElementById('btn-notify-therapists');
-  btn.disabled = true; btn.textContent = '⏳ กำลังส่ง...';
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const res = await API.notifyTherapists(today);
-    if (res.error) throw new Error(res.error);
-    const sent = (res.results || []).filter(r => r.status === 'sent').length;
-    const failed = (res.results || []).filter(r => r.status === 'failed');
-    if (failed.length) {
-      showToast(`ส่งสำเร็จ ${sent} คน, ล้มเหลว ${failed.length} คน (${failed[0].reason})`);
-    } else {
-      showToast(`ส่งอีเมลคิวให้หมอนวด ${sent} คนแล้ว ✓`);
-    }
-  } catch (err) {
-    showToast(`❌ ส่งอีเมลไม่สำเร็จ: ${err.message}`);
-  } finally {
-    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-envelope"></i> Email หมอนวด';
-  }
-});
 
 // ── Report Page ─────────────────────────────────────────────
 async function renderReport() {
@@ -663,4 +724,9 @@ async function init() {
   // Auto-refresh ทุก 15 วินาที
   setInterval(loadBookings, 15000);
   setInterval(loadNotifications, 15000);
+  setInterval(() => {
+    if (document.getElementById('page-queue').classList.contains('active')) {
+      loadUpcomingBookings();
+    }
+  }, 60000);
 }

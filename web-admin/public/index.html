@@ -149,6 +149,55 @@ body {
 .card { background: var(--white); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
 .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .card-header h4 { font-family: 'Noto Serif Thai', serif; font-size: 14.5px; color: var(--forest); font-weight: 600; }
+.dashboard-intro {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  margin: 0 0 20px; padding: 4px 2px;
+}
+.dashboard-kicker {
+  display: inline-flex; align-items: center; gap: 7px; color: var(--jade);
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+.dashboard-intro h2 {
+  margin-top: 5px; color: var(--forest); font-family: 'Noto Serif Thai', serif;
+  font-size: clamp(19px, 2vw, 25px); font-weight: 600; line-height: 1.35;
+}
+.dashboard-intro p { margin-top: 4px; color: var(--slate); font-size: 13px; }
+.dashboard-date {
+  display: inline-flex; align-items: center; gap: 9px; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: 30px; background: var(--white);
+  color: var(--forest-mid); font-size: 12.5px; font-weight: 600; white-space: nowrap;
+}
+.dashboard-date i { color: var(--jade); }
+.dashboard-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.dashboard-stats-grid .stat-card { min-height: 100px; }
+.dashboard-stats-grid .stat-card:nth-child(5)::before { background: #8B5CF6; }
+.dashboard-stats-grid .stat-card:nth-child(6)::before { background: #F59E0B; }
+.dashboard-panels { grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); }
+.dashboard-summary { display: grid; grid-template-columns: minmax(135px, .85fr) minmax(0, 1.15fr); gap: 24px; align-items: center; min-height: 142px; }
+.dashboard-summary-total {
+  position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 128px;
+  justify-content: center; overflow: hidden; padding: 20px; border-radius: 12px;
+  background: linear-gradient(145deg, var(--forest-mid), var(--jade)); color: white;
+}
+.dashboard-summary-total span { font-size: 12px; color: rgba(255,255,255,.8); }
+.dashboard-summary-total strong { font-family: 'Noto Serif Thai', serif; font-size: 42px; line-height: 1; }
+.dashboard-summary-total > i { position: absolute; right: 14px; bottom: 12px; font-size: 46px; opacity: .12; }
+.dashboard-summary-list { display: grid; gap: 13px; }
+.dashboard-summary-item > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.dashboard-summary-item > div:first-child span { color: var(--slate); font-size: 12px; }
+.dashboard-summary-item > div:first-child strong { color: var(--forest); font-size: 13px; }
+.dashboard-summary-track { height: 6px; overflow: hidden; border-radius: 10px; background: var(--mist); }
+.dashboard-summary-track span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--jade-light); transition: width .35s ease; }
+.dashboard-summary-item:nth-child(2) .dashboard-summary-track span { background: #3B82F6; }
+.dashboard-summary-item:nth-child(3) .dashboard-summary-track span { background: #10B981; }
+.dashboard-summary-item:nth-child(4) .dashboard-summary-track span { background: #94A3B8; }
+.dashboard-card-subtitle { margin-top: 3px; color: var(--slate); font-size: 12px; }
+.dashboard-actions-card { display: flex; flex-direction: column; justify-content: center; }
+.dashboard-actions-card .quick-grid { gap: 10px; }
+.dashboard-actions-card .quick-btn { min-height: 52px; padding: 12px; }
+.quick-btn > span { flex: 1; }
+.quick-arrow { margin-left: auto; color: var(--slate-light); font-size: 11px; opacity: 0; transform: translateX(-4px); transition: .15s; }
+.quick-btn:hover .quick-arrow { opacity: 1; transform: translateX(0); }
 
 /* ── BADGES ── */
 .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
@@ -332,6 +381,8 @@ tbody tr:hover td { background: var(--jade-pale); }
 @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 960px) {
   .charts-row, .form-grid, .staff-grid { grid-template-columns: 1fr; }
+  .dashboard-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-summary { grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr); }
   #app-shell { display: block !important; }
   .sidebar { position: static; width: 100%; height: auto; min-height: auto; }
   .sidebar-nav { display: flex; gap: 4px; overflow-x: auto; }
@@ -341,6 +392,17 @@ tbody tr:hover td { background: var(--jade-pale); }
   .topbar { height: auto; min-height: var(--topbar-h); padding: 12px 18px; }
   .topbar-right { width: 100%; justify-content: flex-start; }
   .content { padding: 18px; }
+}
+@media (max-width: 560px) {
+  .dashboard-intro { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .dashboard-date { align-self: flex-start; }
+  .dashboard-stats-grid { gap: 9px; }
+  .dashboard-stats-grid .stat-card { min-height: 86px; padding: 13px 12px; gap: 10px; }
+  .dashboard-stats-grid .stat-icon { width: 36px; height: 36px; font-size: 16px; }
+  .dashboard-stats-grid .stat-info h3 { font-size: 21px; }
+  .dashboard-summary { grid-template-columns: 1fr; gap: 18px; }
+  .dashboard-summary-total { min-height: 100px; }
+  .dashboard-actions-card .quick-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -397,9 +459,6 @@ tbody tr:hover td { background: var(--jade-pale); }
   <header class="topbar">
     <h3 id="page-title">แผงควบคุมหลัก</h3>
     <div class="topbar-right">
-      <button class="btn-secondary" id="btn-sync-sheets" style="margin-left:0"><i class="fa-solid fa-table-cells"></i> Sync to Google Sheets</button>
-      <button class="btn-primary" id="btn-notify-therapists"><i class="fa-solid fa-envelope"></i> Email หมอนวด</button>
-      <div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input class="search-box" type="text" placeholder="ค้นหาชื่อลูกค้า / คิว..."></div>
       <div class="admin-badge">
         <div class="admin-avatar">A</div>
         <span>แอดมิน</span>
@@ -411,7 +470,15 @@ tbody tr:hover td { background: var(--jade-pale); }
 
     <!-- DASHBOARD -->
     <section id="page-dashboard" class="page active">
-      <div class="stats-grid">
+      <div class="dashboard-intro">
+        <div>
+          <span class="dashboard-kicker"><i class="fa-solid fa-sun"></i> ภาพรวมประจำวัน</span>
+          <h2>จัดการบริการวันนี้ให้ราบรื่น</h2>
+          <p>ติดตามจำนวนจองและสถานะคิวของศูนย์บริการในหน้าเดียว</p>
+        </div>
+        <div class="dashboard-date"><i class="fa-regular fa-calendar"></i><span id="dashboard-date"></span></div>
+      </div>
+      <div class="stats-grid dashboard-stats-grid">
         <div class="stat-card">
           <div class="stat-icon" style="background:#E8F5EE"><i class="fa-solid fa-calendar-check" style="color:#2E7D52"></i></div>
           <div class="stat-info"><p>จองวันนี้</p><h3 id="stat-total">-</h3><small id="stat-total-sub"></small></div>
@@ -428,8 +495,6 @@ tbody tr:hover td { background: var(--jade-pale); }
           <div class="stat-icon" style="background:#EBF5FB"><i class="fa-solid fa-sack-dollar" style="color:#2E86DE"></i></div>
           <div class="stat-info"><p>รายได้วันนี้</p><h3 id="stat-revenue">-</h3><small>บาท</small></div>
         </div>
-      </div>
-      <div class="stats-grid" style="margin-top:14px">
         <div class="stat-card">
           <div class="stat-icon" style="background:#F4EBFB"><i class="fa-solid fa-user-group" style="color:#8E44AD"></i></div>
           <div class="stat-info"><p>หมอนวดทั้งหมด</p><h3 id="stat-staff-count">-</h3><small>คน</small></div>
@@ -439,22 +504,60 @@ tbody tr:hover td { background: var(--jade-pale); }
           <div class="stat-info"><p>รอการยืนยัน</p><h3 id="stat-notif-pending">-</h3><small>คน</small></div>
         </div>
       </div>
-      <div class="charts-row">
-        <div class="card">
+      <div class="charts-row dashboard-panels">
+        <div class="card dashboard-summary-card">
           <div class="card-header">
-            <h4>แนวโน้มการจอง (7 วัน)</h4>
-            <span class="badge badge-green">สัปดาห์นี้</span>
+            <h4>สถานะการให้บริการ</h4>
+            <span class="badge badge-green">วันนี้</span>
           </div>
-          <div class="mini-chart" id="trend-chart"></div>
+          <div class="dashboard-summary">
+            <div class="dashboard-summary-total">
+              <span>คิวทั้งหมด</span>
+              <strong id="dashboard-queue-total">0</strong>
+              <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
+            </div>
+            <div class="dashboard-summary-list">
+              <div class="dashboard-summary-item">
+                <div><span>รอคิว</span><strong id="dashboard-waiting-count">0</strong></div>
+                <div class="dashboard-summary-track"><span id="dashboard-waiting-bar"></span></div>
+              </div>
+              <div class="dashboard-summary-item">
+                <div><span>กำลังให้บริการ</span><strong id="dashboard-service-count">0</strong></div>
+                <div class="dashboard-summary-track"><span id="dashboard-service-bar"></span></div>
+              </div>
+              <div class="dashboard-summary-item">
+                <div><span>เสร็จสิ้น</span><strong id="dashboard-done-count">0</strong></div>
+                <div class="dashboard-summary-track"><span id="dashboard-done-bar"></span></div>
+              </div>
+              <div class="dashboard-summary-item">
+                <div><span>ยกเลิก</span><strong id="dashboard-cancelled-count">0</strong></div>
+                <div class="dashboard-summary-track"><span id="dashboard-cancelled-bar"></span></div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="card">
-          <div class="card-header"><h4>Quick Actions</h4></div>
-          <div class="quick-grid">
-            <button class="quick-btn" data-goto="bookings"><i class="fa-solid fa-clipboard-list"></i> เพิ่มการจองใหม่</button>
-            <button class="quick-btn" id="btn-call-next"><i class="fa-solid fa-bullhorn"></i> เรียกคิวถัดไป</button>
-            <button class="quick-btn" data-goto="report"><i class="fa-solid fa-file-lines"></i> สรุปรายงานวันนี้</button>
-            <button class="quick-btn" data-goto="queue"><i class="fa-solid fa-list-ol"></i> จัดการคิวว่าง</button>
+        <div class="card dashboard-actions-card">
+          <div class="card-header">
+            <div><h4>ทางลัด</h4><p class="dashboard-card-subtitle">เข้าถึงงานที่ใช้บ่อยได้ทันที</p></div>
           </div>
+          <div class="quick-grid">
+            <button class="quick-btn" data-goto="bookings"><i class="fa-solid fa-clipboard-list"></i><span>เพิ่มการจองใหม่</span><i class="fa-solid fa-arrow-right quick-arrow"></i></button>
+            <button class="quick-btn" id="btn-call-next"><i class="fa-solid fa-bullhorn"></i><span>เรียกคิวถัดไป</span><i class="fa-solid fa-arrow-right quick-arrow"></i></button>
+            <button class="quick-btn" data-goto="report"><i class="fa-solid fa-file-lines"></i><span>สรุปรายงานวันนี้</span><i class="fa-solid fa-arrow-right quick-arrow"></i></button>
+            <button class="quick-btn" data-goto="queue"><i class="fa-solid fa-list-ol"></i><span>จัดการคิว</span><i class="fa-solid fa-arrow-right quick-arrow"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <h4>รายชื่อผู้จองวันนี้</h4>
+          <span class="badge badge-blue" id="dashboard-bookings-count">0 รายการ</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>คิว</th><th>เวลา</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th></tr></thead>
+            <tbody id="dashboard-bookings-tbody"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -500,6 +603,15 @@ tbody tr:hover td { background: var(--jade-pale); }
 
     <!-- QUEUE -->
     <section id="page-queue" class="page">
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <label for="queue-search" style="font-size:14px;font-weight:600;color:var(--forest)">ค้นหาคิว</label>
+          <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input class="search-box" id="queue-search" type="search" placeholder="ค้นหาชื่อลูกค้า / คิว..." aria-label="ค้นหาคิวจากชื่อลูกค้า หมายเลขคิว เบอร์โทร บริการ หรือหมอนวด">
+          </div>
+        </div>
+      </div>
       <div class="queue-layout">
         <div class="card">
           <div class="card-header"><h4>สถานะคิวปัจจุบัน</h4></div>
@@ -531,11 +643,29 @@ tbody tr:hover td { background: var(--jade-pale); }
         </div>
         <div class="card" style="grid-column:1/-1">
           <div class="card-header">
+            <h4>การจองล่วงหน้า</h4>
+            <div style="display:flex;align-items:center;gap:12px">
+              <label for="queue-date-filter" style="font-size:13px;color:var(--slate)">กรองวันที่</label>
+              <input type="date" id="queue-date-filter" aria-label="กรองการจองล่วงหน้าตามวันที่">
+              <button type="button" class="btn-secondary" id="queue-date-clear">ทั้งหมด</button>
+              <button type="button" class="btn-secondary" id="queue-upcoming-refresh" aria-label="โหลดการจองล่วงหน้าใหม่"><i class="fa-solid fa-rotate"></i></button>
+              <span class="badge badge-blue" id="upcoming-bookings-count">0 รายการ</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>วันที่</th><th>คิว</th><th>เวลา</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+              <tbody id="upcoming-bookings-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header">
             <h4>สถานะการแจ้งเตือน</h4>
             <span class="badge badge-yellow" id="notif-pending-count">0 คนยังไม่ยืนยัน</span>
           </div>
           <p style="font-size:12.5px;color:var(--slate);margin:-4px 0 10px">
-            ลูกค้าที่ "ยังไม่ยืนยัน" หลังเรียกคิว อาจไม่เห็นการแจ้งเตือนในแอป — โทรติดต่อจากเบอร์ด้านล่างได้เลย
+            หากลูกค้ายังไม่ยืนยัน สามารถกดส่งการแจ้งเตือนซ้ำจากรายการได้
           </p>
           <div class="table-wrap">
             <table>
@@ -630,7 +760,6 @@ tbody tr:hover td { background: var(--jade-pale); }
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
 <script src="js/app.js"></script>

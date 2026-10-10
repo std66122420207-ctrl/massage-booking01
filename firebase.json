@@ -5,11 +5,12 @@
   },
   "functions": {
     "source": ".",
-    "runtime": "nodejs20"
+    "runtime": "nodejs20",
+    "predeploy": ["npm run predeploy:firebase"]
   },
   "hosting": [
     {
-      "site": "massage-booking-ce032",
+      "target": "admin",
       "public": "web-admin/public",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
@@ -17,8 +18,9 @@
       ]
     },
     {
-      "site": "massage-booking-customer",
+      "target": "customer",
       "public": "flutter-app/build/web",
+      "predeploy": ["npm run build:flutter:deploy"],
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
         { "source": "/api{,/**}", "function": { "functionId": "api", "region": "asia-southeast1" } }

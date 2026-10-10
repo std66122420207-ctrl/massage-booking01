@@ -8,6 +8,7 @@ class BookingService extends ChangeNotifier {
   List<BookingModel> _bookings = [];
   List<NotificationModel> _notifications = [];
   bool _loading = false;
+  bool _servicesLoading = false;
   bool _notificationsLoading = false;
   String? _error;
 
@@ -19,6 +20,7 @@ class BookingService extends ChangeNotifier {
   List<NotificationModel> get notifications => _notifications;
   int get unconfirmedCount => _notifications.where((n) => !n.confirmed).length;
   bool get loading => _loading;
+  bool get servicesLoading => _servicesLoading;
   bool get notificationsLoading => _notificationsLoading;
   String? get error => _error;
 
@@ -26,7 +28,9 @@ class BookingService extends ChangeNotifier {
   /// ถ้าโหลดไม่สำเร็จ (เช่น server ยังไม่ได้รัน) จะปล่อยให้ UI แสดง
   /// fallback ของตัวเอง (ดู services_screen.dart -> _ServiceListFallback)
   Future<void> loadServices() async {
+    _servicesLoading = true;
     _error = null;
+    notifyListeners();
     try {
       final data = await ApiClient.get('/services');
       _services = (data as List)
@@ -36,8 +40,10 @@ class BookingService extends ChangeNotifier {
     } catch (e) {
       _error = 'โหลดรายการบริการไม่สำเร็จ: $e';
       _services = [];
+    } finally {
+      _servicesLoading = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> loadStaff() async {
@@ -120,20 +126,7 @@ class BookingService extends ChangeNotifier {
       final i = _bookings.indexWhere((b) => b.id == bookingId);
       if (i != -1) {
         final old = _bookings[i];
-        _bookings[i] = BookingModel(
-          id: old.id,
-          userId: old.userId,
-          serviceId: old.serviceId,
-          serviceName: old.serviceName,
-          servicePrice: old.servicePrice,
-          staffId: old.staffId,
-          staffName: old.staffName,
-          bookingDate: old.bookingDate,
-          timeSlot: old.timeSlot,
-          queueNumber: old.queueNumber,
-          status: 'cancelled',
-          createdAt: old.createdAt,
-        );
+        _bookings[i] = old.copyWith(status: 'cancelled');
         notifyListeners();
       }
       return true;
@@ -175,8 +168,7 @@ class BookingService extends ChangeNotifier {
     }
   }
 
-  /// กดยืนยันว่าเห็นการแจ้งเตือนแล้ว (POST /api/notifications/:id/confirm)
-  /// ทำให้แอดมินรู้ว่าไม่ต้องโทรติดต่อสำรอง
+  /// ยืนยันว่าเห็นการแจ้งเตือนหรือมาถึงตามเวลานัด
   Future<bool> confirmNotification(String notificationId) async {
     try {
       await ApiClient.post('/notifications/$notificationId/confirm');
@@ -186,6 +178,8 @@ class BookingService extends ChangeNotifier {
         _notifications[i] = NotificationModel(
           id: old.id,
           message: old.message,
+          type: old.type,
+          resolvedAction: old.resolvedAction,
           confirmed: true,
           createdAt: old.createdAt,
         );

@@ -126,7 +126,13 @@ class _NotificationCard extends StatelessWidget {
                 Text(time,
                     style:
                         TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                if (!notification.confirmed) ...[
+                if (notification.resolvedAction == 'cancelled') ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'คิวนี้ถูกยกเลิกอัตโนมัติ เนื่องจากไม่ยืนยันการมาถึงภายใน 5 นาที',
+                    style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                  ),
+                ] else if (!notification.confirmed) ...[
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 36,
@@ -149,12 +155,14 @@ class _NotificationCard extends StatelessWidget {
                           );
                         }
                       },
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.done, size: 17),
-                          SizedBox(width: 6),
-                          Text('รับทราบแล้ว'),
+                          const Icon(Icons.done, size: 17),
+                          const SizedBox(width: 6),
+                          Text(notification.type == 'appointment_due'
+                              ? 'ฉันมาถึงแล้ว'
+                              : 'รับทราบแล้ว'),
                         ],
                       ),
                     ),

@@ -3,6 +3,7 @@
 //  รัน: node scripts/test_api.js
 // ============================================================
 require('dotenv').config();
+process.env.NODE_ENV = 'test';
 const http = require('http');
 const app  = require('../index');
 const { isBookingCounted, summarizeBookingCounts } = require('../routes/admin');
@@ -65,6 +66,37 @@ async function runTests() {
       if (res.body.length === 0) throw new Error('Expected at least 1 service');
     });
 
+    await test('GET /api/services returns exactly the approved four service names', async () => {
+      const res = await request('/api/services');
+      if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
+      const names = res.body.map((service) => service.name);
+      const expected = ['ประคบหินร้อน', 'นวดเท้า', 'นวดตัว', 'กัวชา'];
+      if (names.length !== expected.length) {
+        throw new Error(`Expected ${expected.length} services, got ${names.length}: ${names.join(', ')}`);
+      }
+      const mismatch = expected.find((name, index) => names[index] !== name);
+      if (mismatch) {
+        throw new Error(`Expected service list to start with ${expected.join(', ')}, got ${names.join(', ')}`);
+      }
+      if (names.some((name) => name === 'กัวซา')) {
+        throw new Error('Legacy alias กัวซา should not appear in the public service list');
+      }
+    });
+
+    await test('GET /api/bookings/admin/upcoming requires admin authentication', async () => {
+      const res = await request('/api/bookings/admin/upcoming');
+      if (res.status !== 401 && res.status !== 403) {
+        throw new Error(`Expected protected route response 401/403, got ${res.status}`);
+      }
+    });
+
+    await test('POST /api/staff/photo requires admin authentication', async () => {
+      const res = await request('/api/staff/photo', { method: 'POST' });
+      if (res.status !== 401 && res.status !== 403) {
+        throw new Error(`Expected protected route response 401/403, got ${res.status}`);
+      }
+    });
+
     // 3. Staff list
     await test('GET /api/staff returns list of therapists', async () => {
       const res = await request('/api/staff');
@@ -80,12 +112,15 @@ async function runTests() {
       if (typeof res.body !== 'object') throw new Error('Expected object response');
     });
 
-    // 5. ThaiD mock page
-    await test('GET /api/auth/thaid/mock returns mock HTML form', async () => {
-      const res = await request('/api/auth/thaid/mock');
-      if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
-      if (!res.text.includes('จำลองการยืนยันตัวตนด้วย ThaiD')) {
-        throw new Error('Expected HTML containing mock ThaiD form');
+    // 5. Removed identity-provider endpoints stay unavailable.
+    await test('GET /api/auth/thaid endpoints return 404', async () => {
+      for (const path of [
+        '/api/auth/thaid',
+        '/api/auth/thaid/callback',
+        '/api/auth/thaid/mock',
+      ]) {
+        const res = await request(path);
+        if (res.status !== 404) throw new Error(`Expected 404 for ${path}, got ${res.status}`);
       }
     });
 
