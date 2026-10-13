@@ -19,7 +19,9 @@ firebase.initializeApp(firebaseConfig);
 // ตอน deploy จริง: เปลี่ยนเป็น URL ของ Render / Azure / server ปลายทาง
 const API_BASE = (() => {
   const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (isLocalDev && (window.location.port === '4000' || window.location.port === '3000')) {
+  if (isLocalDev) {
+    // Admin site is commonly served on 8081 during local dev, but the API runs on 3000.
+    // Without this override, the browser calls http://localhost:8081/api and gets 404.
     return 'http://localhost:3000/api';
   }
   return window.location.origin + '/api';
