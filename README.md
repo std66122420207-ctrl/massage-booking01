@@ -63,7 +63,7 @@ npm run test:flutter
 firebase deploy --only functions,firestore:rules,firestore:indexes,hosting
 ```
 
-ก่อนปล่อยจริงให้ทดสอบล็อกอิน/จอง/ยกเลิก/แจ้งเตือน/อัปโหลดรูป และยืนยันว่า
+ก่อนปล่อยจริงให้ทดสอบล็อกอิน/จอง/ยกเลิก/แจ้งเตือน และยืนยันว่า
 Cloud Scheduler ทำงานได้หลัง deploy; การแจ้งเตือนผ่าน SMS ต้องตั้งค่า Twilio เพิ่ม
 การ deploy เป็นขั้นตอนที่ผู้ดูแลต้องเรียกใช้เอง; การตรวจสอบในเครื่องไม่เปลี่ยน
 ทรัพยากรบน Firebase.
@@ -236,8 +236,7 @@ massage-booking/
 1. สร้างโปรเจคที่ [Firebase Console](https://console.firebase.google.com/)
 2. เปิดใช้งาน **Authentication** → Email/Password และ Phone
 3. เปิดใช้งาน **Firestore Database**
-4. เปิดใช้งาน **Storage** และตรวจสอบ bucket name ในหน้า Storage
-5. สำหรับการรันในเครื่อง ตั้งค่า Firebase Admin credentials ใน `server/.env`.
+4. สำหรับการรันในเครื่อง ตั้งค่า Firebase Admin credentials ใน `server/.env`.
    บน Firebase Cloud Functions ให้ใช้ service identity/Application Default Credentials
    และอย่านำไฟล์ private key เข้า source control หรือใส่ใน deployment bundle
 
@@ -248,7 +247,6 @@ cd server
 npm install
 cp .env.example .env
 # แก้ไข .env ใส่ค่า Firebase Admin SDK ของจริง
-# ตั้ง FIREBASE_STORAGE_BUCKET ให้ตรงกับชื่อ bucket ใน Firebase Storage
 
 # วางไฟล์ serviceAccountKey.json (ถ้าจะใช้วิธีไฟล์แทน .env)
 
@@ -259,7 +257,7 @@ Server จะรันที่ `http://localhost:3000`
 - API: `http://localhost:3000/api`
 - Web Admin: `http://localhost:3000` (เสิร์ฟไฟล์ static อัตโนมัติ)
 
-การอัปโหลดรูปหมอนวดใช้ Firebase Admin SDK ผ่าน API และรองรับ JPG, PNG, WebP ขนาดไม่เกิน 5 MB บัญชี Service Account ของ Server ต้องมีสิทธิ์เขียน Firebase Storage objects
+เพิ่มหรือแก้ไขรูปหมอนวดโดยใส่ URL รูปภาพในช่อง URL ของหน้า Web Admin โดยตรง ระบบไม่ต้องเปิดใช้ Firebase Storage
 
 ### 3️⃣ เพิ่มข้อมูลตัวอย่าง (บริการ + หมอนวด)
 

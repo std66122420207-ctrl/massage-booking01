@@ -1,30 +1,7 @@
 const express = require('express');
-const crypto = require('crypto');
 const router  = express.Router();
 const { db, COLLECTIONS, admin } = require('../config/firebase');
-const { getStorage } = require('firebase-admin/storage');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-
-const IMAGE_TYPES = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
-
-const parseImageBody = express.raw({
-  type: Object.keys(IMAGE_TYPES),
-  limit: '5mb',
-});
-
-function readImageBody(req, res, next) {
-  parseImageBody(req, res, (err) => {
-    if (!err) return next();
-    if (err.type === 'entity.too.large') {
-      return res.status(413).json({ error: 'รูปภาพต้องมีขนาดไม่เกิน 5 MB' });
-    }
-    return res.status(400).json({ error: 'อ่านไฟล์รูปภาพไม่สำเร็จ' });
-  });
-}
 
 // GET /api/staff — รายชื่อหมอนวดทั้งหมด
 router.get('/', async (req, res) => {
@@ -62,41 +39,6 @@ function isValidPhone(phone) {
   const normalized = phone.trim().replace(/[\s()-]/g, '');
   return /^\+?\d{8,15}$/.test(normalized);
 }
-
-// POST /api/staff/photo — Admin: upload therapist photo through Firebase Admin SDK
-router.post('/photo', verifyToken, requireAdmin, readImageBody, async (req, res) => {
-  const contentType = req.headers['content-type'];
-  const extension = IMAGE_TYPES[contentType];
-  if (!extension) {
-    return res.status(415).json({ error: 'รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP' });
-  }
-  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-    return res.status(400).json({ error: 'ไม่พบข้อมูลรูปภาพ' });
-  }
-
-  try {
-    const bucket = getStorage().bucket();
-    const objectPath = `staff-photos/${crypto.randomUUID()}.${extension}`;
-    const downloadToken = crypto.randomUUID();
-    const file = bucket.file(objectPath);
-
-    await file.save(req.body, {
-      resumable: false,
-      metadata: {
-        contentType,
-        metadata: { firebaseStorageDownloadTokens: downloadToken },
-      },
-    });
-
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${downloadToken}`;
-    res.status(201).json({ url });
-  } catch (err) {
-    console.error('Staff photo upload failed:', err);
-    res.status(503).json({
-      error: 'อัปโหลดรูปไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า Firebase Storage และสิทธิ์ของ Server',
-    });
-  }
-});
 
 // PATCH /api/staff/:id/status — Admin: อัปเดตสถานะหมอนวด
 router.patch('/:id/status', verifyToken, requireAdmin, async (req, res) => {
@@ -144,7 +86,7 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
       name,
       phone: phone?.trim() || null,
       experience: experience || '',
-      photo: photo || null, // URL รูปภาพ (เช่น อัปโหลดไป Firebase Storage แล้วใส่ URL ที่นี่)
+      photo: photo || null,
       status: 'available',
       active: true,
       todayCount: 0,

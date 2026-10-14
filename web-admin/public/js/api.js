@@ -38,19 +38,6 @@ const API = {
     });
   },
 
-  async uploadStaffPhoto(file) {
-    const token = await this._token();
-    const headers = {
-      'Content-Type': file.type,
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    };
-    return this._request('/staff/photo', {
-      method: 'POST',
-      headers,
-      body: file,
-    });
-  },
-
   async updateStaff(id, data) {
     return this._request(`/staff/${id}`, {
       method: 'PATCH',

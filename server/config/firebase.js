@@ -21,13 +21,8 @@ if (!admin.apps.length) {
     firebaseConfig.projectId ||
     ''
   ).trim();
-  const storageBucket =
-    process.env.FIREBASE_STORAGE_BUCKET ||
-    firebaseConfig.storageBucket ||
-    (projectId ? `${projectId}.firebasestorage.app` : undefined);
   const firebaseOptions = {
     ...(projectId ? { projectId } : {}),
-    ...(storageBucket ? { storageBucket } : {}),
   };
   const hasServiceAccount = Boolean(
     clientEmail &&

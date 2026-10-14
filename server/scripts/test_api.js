@@ -90,10 +90,10 @@ async function runTests() {
       }
     });
 
-    await test('POST /api/staff/photo requires admin authentication', async () => {
+    await test('POST /api/staff/photo is not available without Firebase Storage', async () => {
       const res = await request('/api/staff/photo', { method: 'POST' });
-      if (res.status !== 401 && res.status !== 403) {
-        throw new Error(`Expected protected route response 401/403, got ${res.status}`);
+      if (res.status !== 404) {
+        throw new Error(`Expected removed upload route response 404, got ${res.status}`);
       }
     });
 
