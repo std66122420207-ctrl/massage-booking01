@@ -40,17 +40,16 @@ class DefaultFirebaseOptions {
     projectId: 'massage-booking-ce032',
     authDomain: 'massage-booking-ce032.firebaseapp.com',
     storageBucket: 'massage-booking-ce032.firebasestorage.app',
+    measurementId: 'G-HR6BKWNWWQ',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDZR-e5Af_yn2M8FM9Xmj178nfRx3218Wo',
-    appId:
-        'YOUR_ANDROID_APP_ID', // รัน flutterfire configure หรือใส่ Android App ID จาก Firebase Console
+    apiKey: 'AIzaSyAuVsvR-av1P8BaCwxdu6B_YIZdRI2GI4E',
+    appId: '1:557416054160:android:7764857d72d6ba021e0715',
     messagingSenderId: '557416054160',
     projectId: 'massage-booking-ce032',
     storageBucket: 'massage-booking-ce032.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'YOUR_API_KEY',
     appId: 'YOUR_IOS_APP_ID',

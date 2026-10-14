@@ -97,12 +97,22 @@ async function runTests() {
       }
     });
 
+    await test('GET /api/staff/admin requires admin authentication', async () => {
+      const res = await request('/api/staff/admin');
+      if (res.status !== 401 && res.status !== 403) {
+        throw new Error(`Expected protected route response 401/403, got ${res.status}`);
+      }
+    });
+
     // 3. Staff list
     await test('GET /api/staff returns list of therapists', async () => {
       const res = await request('/api/staff');
       if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`);
       if (!Array.isArray(res.body)) throw new Error('Expected array of staff');
       if (res.body.length === 0) throw new Error('Expected at least 1 staff member');
+      if (res.body.some((staff) => Object.hasOwn(staff, 'email') || Object.hasOwn(staff, 'phone'))) {
+        throw new Error('Public staff responses must not expose private contact details');
+      }
     });
 
     // 4. Queue status

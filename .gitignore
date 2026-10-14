@@ -15,6 +15,7 @@ flutter-app/.dart_tool/
 flutter-app/.flutter-plugins
 flutter-app/.flutter-plugins-dependencies
 flutter-app/.packages
+flutter-app/android/.kotlin/
 flutter-app/pubspec.lock
 flutter-app/android/local.properties
 flutter-app/ios/Flutter/Flutter.podspec

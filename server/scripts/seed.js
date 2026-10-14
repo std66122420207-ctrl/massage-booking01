@@ -14,9 +14,9 @@ const services = [
 ];
 
 const staff = [
-  { name: 'พี่นภา',    email: 'napa.staff@example.com',    experience: '5 ปี', status: 'available', todayCount: 0, active: true },
-  { name: 'พี่สมชาย',  email: 'somchai.staff@example.com', experience: '8 ปี', status: 'available', todayCount: 0, active: true },
-  { name: 'พี่มาเรียว', email: 'mario.staff@example.com',   experience: '3 ปี', status: 'available', todayCount: 0, active: true },
+  { name: 'พี่นภา', phone: null, experience: '5 ปี', status: 'available', todayCount: 0, active: true },
+  { name: 'พี่สมชาย', phone: null, experience: '8 ปี', status: 'available', todayCount: 0, active: true },
+  { name: 'พี่มาเรียว', phone: null, experience: '3 ปี', status: 'available', todayCount: 0, active: true },
 ];
 
 async function seed() {

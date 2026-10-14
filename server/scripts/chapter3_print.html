@@ -217,8 +217,6 @@
     <li><strong>ระบบจัดการคิวงาน (Queue Management):</strong> มีปุ่มเรียกคิวถัดไป (Call Next) และปรับสถานะคิวงานได้ตามขั้นตอน</li>
     <li><strong>ระบบจัดการข้อมูลหมอนวด (Therapist Management):</strong> เพิ่ม ลบ แก้ไข ข้อมูลหมอนวด ประสบการณ์ และสถานะความพร้อม</li>
     <li><strong>ระบบติดตามการแจ้งเตือนลูกค้า:</strong> ตรวจสอบว่าลูกค้ารับทราบการเรียกคิวแล้วหรือไม่ หากยังไม่กดยืนยัน จะมีเบอร์โทรศัพท์ให้เจ้าหน้าที่โทรติดต่อได้ทันที</li>
-    <li><strong>ระบบส่งออกข้อมูลไปยัง Google Sheets:</strong> ซิงค์ข้อมูลการจองทั้งหมดไปยัง Google Spreadsheet อัตโนมัติด้วยคลิกเดียว</li>
-    <li><strong>ระบบส่งอีเมลแจ้งตารางงานหมอนวด:</strong> สรุปคิวงานประจำวันและส่งอีเมลแจ้งหมอนวดแต่ละท่านแยกรายบุคคลผ่าน SMTP</li>
   </ul>
 </div>
 
@@ -233,7 +231,7 @@
 
   <h2 class="section-title">3.2 แผนภาพกรณีการใช้งาน (Use Case Diagram)</h2>
   <p>
-    แผนภาพกรณีการใช้งาน (Use Case Diagram) แสดงความสัมพันธ์ระหว่างกลุ่มผู้ใช้งาน (Actors) ได้แก่ <strong>ผู้ใช้บริการ (Customer)</strong>, <strong>ผู้ดูแลระบบ/เจ้าหน้าที่ (Admin/Staff)</strong> และระบบภายนอก (ThaiD, Google Sheets, Mail Server) กับฟังก์ชันหลักของระบบ ดังแสดงในภาพที่ 3.1
+    แผนภาพกรณีการใช้งาน (Use Case Diagram) แสดงความสัมพันธ์ระหว่างกลุ่มผู้ใช้งาน (Actors) ได้แก่ <strong>ผู้ใช้บริการ (Customer)</strong>, <strong>ผู้ดูแลระบบ/เจ้าหน้าที่ (Admin/Staff)</strong> และระบบยืนยันตัวตน ThaiD กับฟังก์ชันหลักของระบบ ดังแสดงในภาพที่ 3.1
   </p>
 
   <div class="diagram-container">
@@ -315,14 +313,6 @@
       <ellipse cx="430" cy="240" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
       <text x="430" y="245" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-11: ตรวจสอบการยืนยันของลูกค้า</text>
 
-      <!-- UC12: Sync Sheets -->
-      <ellipse cx="430" cy="300" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
-      <text x="430" y="305" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-12: ซิงค์ข้อมูล Google Sheets</text>
-
-      <!-- UC13: Email dispatch -->
-      <ellipse cx="430" cy="360" rx="90" ry="18" fill="#ffffff" stroke="#1a6e9e" stroke-width="1.8" filter="url(#shadow)"/>
-      <text x="430" y="365" font-family="'Sarabun', sans-serif" font-size="11.5" font-weight="500" fill="#0f3750" text-anchor="middle">UC-13: ส่งอีเมลแจ้งตารางงานหมอนวด</text>
-
       <!-- CONNECTIONS (User -> UCs) -->
       <line x1="85" y1="210" x2="160" y2="65" stroke="#2e7d52" stroke-width="1.2"/>
       <line x1="85" y1="210" x2="160" y2="115" stroke="#2e7d52" stroke-width="1.2"/>
@@ -337,8 +327,6 @@
       <line x1="595" y1="210" x2="520" y2="120" stroke="#1a6e9e" stroke-width="1.5"/>
       <line x1="595" y1="210" x2="520" y2="180" stroke="#1a6e9e" stroke-width="1.2"/>
       <line x1="595" y1="210" x2="520" y2="240" stroke="#1a6e9e" stroke-width="1.2"/>
-      <line x1="595" y1="210" x2="520" y2="300" stroke="#1a6e9e" stroke-width="1.2"/>
-      <line x1="595" y1="210" x2="520" y2="360" stroke="#1a6e9e" stroke-width="1.2"/>
     </svg>
     <div class="diagram-caption">ภาพที่ 3.1 แผนภาพกรณีการใช้งาน (Use Case Diagram) ของระบบจองคิวนวดแผนไทย</div>
   </div>
@@ -481,60 +469,16 @@
       <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
         1. เจ้าหน้าที่เปิดแท็บ "แพทย์/หมอนวด" บน Web Admin<br>
         2. สามารถเลือกกด "+ เพิ่มหมอนวดใหม่" หรือกด "แก้ไขข้อมูล" ในการ์ดหมอนวดแต่ละคน<br>
-        3. กรอกข้อมูล: ชื่อ-นามสกุล, อีเมล (สำหรับรับตารางงาน), ประสบการณ์, URL รูปภาพ<br>
+        3. กรอกข้อมูล: ชื่อ-นามสกุล, เบอร์ติดต่อ, ประสบการณ์, URL รูปภาพ<br>
         4. เลือกปรับสถานะการทำงาน (<code>available</code>, <code>busy</code>, <code>break</code>, <code>off</code>)<br>
         5. กดยืนยันบันทึกข้อมูล &rarr; ระบบอัปเดตข้อมูลบนฐานข้อมูลแบบเรียลไทม์
       </td></tr>
       <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
-        3a. รูปแบบอีเมลไม่ถูกต้อง: ระบบแสดงแจ้งเตือน "รูปแบบอีเมลไม่ถูกต้อง" และไม่อนุญาตให้บันทึก
+        3a. รูปแบบเบอร์ติดต่อไม่ถูกต้อง: ระบบแสดงข้อความแจ้งเตือนและไม่อนุญาตให้บันทึก
       </td></tr>
     </table>
   </div>
 
-  <div class="table-container">
-    <div class="table-caption">ตารางที่ 3.7 รายละเอียด Use Case: UC-12 การซิงค์ข้อมูล Google Sheets (Google Sheets Sync)</div>
-    <table class="academic-table">
-      <tr><td class="col-head">รหัส Use Case</td><td>UC-12</td></tr>
-      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การซิงค์ข้อมูลไปยัง Google Sheets (Google Sheets Sync)</td></tr>
-      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ดูแลระบบ (Admin), ระบบ Google Sheets API</td></tr>
-      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อส่งออกข้อมูลการจองทั้งหมดสำหรับทำรายงานทางสถิติของศูนย์สุขภาพ</td></tr>
-      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>มีการตั้งค่า Service Account และ Spreadsheet ID ในระบบเรียบร้อยแล้ว</td></tr>
-      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>แผ่นงาน <code>Bookings</code> ใน Google Sheets ได้รับการอัปเดตข้อมูลแถวใหม่ล่าสุด</td></tr>
-      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
-        1. ผู้ดูแลระบบกดปุ่ม <strong>"Sync to Google Sheets"</strong> บนแถบด้านบนของ Web Admin<br>
-        2. Backend ดึงข้อมูลรายการจองทั้งหมด พร้อม Map ชื่อหมอนวดและข้อมูลติดต่อผู้ใช้<br>
-        3. Backend เชื่อมต่อกับ Google Sheets API v4 ผ่าน JWT Authentication<br>
-        4. ระบบทำการเขียนข้อมูล Header และบันทึกแถวข้อมูลการจองทั้งหมดลงในตารางสเปรดชีต<br>
-        5. Web Admin แสดงผลลัพธ์แจ้งเตือน "ซิงค์ข้อมูลสำเร็จ" พร้อมจำนวนแถวข้อมูลที่ถูกส่งออก
-      </td></tr>
-      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
-        3a. ไม่ได้ตั้งค่า Credential หรือสิทธิ์เข้าถึงไม่ถูกต้อง: ระบบตอบกลับ Error 500 พร้อมแจ้งสาเหตุ
-      </td></tr>
-    </table>
-  </div>
-
-  <div class="table-container">
-    <div class="table-caption">ตารางที่ 3.8 รายละเอียด Use Case: UC-13 การส่งอีเมลแจ้งตารางงานหมอนวด (Therapist Email Dispatch)</div>
-    <table class="academic-table">
-      <tr><td class="col-head">รหัส Use Case</td><td>UC-13</td></tr>
-      <tr><td class="col-head">ชื่อกรณีการใช้งาน</td><td>การส่งอีเมลแจ้งตารางงานหมอนวด (Therapist Email Dispatch)</td></tr>
-      <tr><td class="col-head">ผู้กระทำ (Actor)</td><td>ผู้ดูแลระบบ (Admin), ระบบ Mail Server (Nodemailer / Gmail SMTP)</td></tr>
-      <tr><td class="col-head">วัตถุประสงค์</td><td>เพื่อส่งตารางคิวนัดหมายประจำวันให้แก่หมอนวดแต่ละคนแยกรายบุคคล</td></tr>
-      <tr><td class="col-head">เงื่อนไขก่อนทำ (Pre-condition)</td><td>หมอนวดมีข้อมูลอีเมลที่ถูกต้องในระบบ และมีคิวการจองในวันที่เลือก</td></tr>
-      <tr><td class="col-head">เงื่อนไขหลังทำ (Post-condition)</td><td>อีเมลสรุปตารางงานถูกส่งเข้ากล่องข้อความของหมอนวดแต่ละคน</td></tr>
-      <tr><td class="col-head">ขั้นตอนหลัก (Main Flow)</td><td>
-        1. ผู้ดูแลระบบกดปุ่ม <strong>"Email หมอนวด"</strong> บน Web Admin<br>
-        2. Backend ดึงรายการจองของวันปัจจุบันที่สถานะเป็น <code>pending</code> หรือ <code>confirmed</code><br>
-        3. ระบบจัดกลุ่มการจองแยกตามหมอนวดแต่ละคน (Group by Staff ID)<br>
-        4. ระบบสร้างเทมเพลต HTML ตารางสรุปเวลา, เลขคิว, บริการ และชื่อลูกค้า<br>
-        5. ส่งอีเมลผ่าน Nodemailer ไปยังหมอนวดแต่ละท่านที่มีคิวงาน<br>
-        6. Web Admin แสดงรายงานสรุปผลการส่งอีเมล (จำนวนที่ส่งสำเร็จและรายชื่อผู้รับ)
-      </td></tr>
-      <tr><td class="col-head">ขั้นตอนสำรอง (Alt Flow)</td><td>
-        3a. หมอนวดท่านใดไม่มีคิวในวันนั้น: ระบบจะไม่ส่งอีเมลหาหมอนวดท่านนั้นเพื่อไม่ให้เกิดความสับสน
-      </td></tr>
-    </table>
-  </div>
 </div>
 
 <!-- หน้าที่ 6: Sequence Diagram 1 -->
@@ -830,7 +774,7 @@
       <text x="570" y="48" font-family="'Prompt', sans-serif" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">STAFF (หมอนวด)</text>
       <text x="490" y="75" font-family="'Sarabun', sans-serif" font-size="11" font-weight="600" fill="#991b1b">[PK] id : String</text>
       <text x="490" y="95" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">name : String</text>
-      <text x="490" y="115" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">email : String</text>
+      <text x="490" y="115" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">phone : String</text>
       <text x="490" y="135" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">experience : String</text>
       <text x="490" y="155" font-family="'Sarabun', sans-serif" font-size="11" fill="#333">photo : String (URL)</text>
       <text x="490" y="172" font-family="'Sarabun', sans-serif" font-size="10.5" fill="#777">status : String / active</text>
@@ -935,7 +879,7 @@
   </p>
   <ul>
     <li><strong>Flutter Client Application (สำหรับผู้ใช้บริการ):</strong> ใช้โทนสี Forest Green (<code>#1B3A2D</code>) และ Jade (<code>#2E7D52</code>) ร่วมกับตัวอักษร Noto Serif Thai และ Sarabun ประกอบด้วยหน้าจอหลัก ได้แก่ หน้าเข้าสู่ระบบ ThaiD/OTP, หน้ารายการบริการและขั้นตอนเลือกวันเวลา, หน้าบัตรคิวสด และศูนย์การแจ้งเตือน</li>
-    <li><strong>Web Admin Dashboard (สำหรับเจ้าหน้าที่):</strong> พัฒนาในรูปแบบ Single Page Application (SPA) มี Sidebar นำทาง, การ์ดแสดงสถิติ Real-time, ตารางจัดการคิวพร้อมปุ่ม Call Next และปุ่มฟังก์ชันพิเศษ "Sync to Google Sheets" และ "Email หมอนวด" บนแถบ Topbar</li>
+    <li><strong>Web Admin Dashboard (สำหรับเจ้าหน้าที่):</strong> พัฒนาในรูปแบบ Single Page Application (SPA) มี Sidebar นำทาง, การ์ดแสดงสถิติ Real-time, ตารางจัดการคิวพร้อมปุ่ม Call Next และหน้าจัดการข้อมูลหมอนวดพร้อมเบอร์ติดต่อ</li>
   </ul>
 
   <h2 class="section-title">3.8 สรุปผลบทที่ 3</h2>

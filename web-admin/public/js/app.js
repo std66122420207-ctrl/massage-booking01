@@ -155,7 +155,7 @@ async function loadServices() {
 
 async function loadStaff() {
   try {
-    staffList = await API.getStaff();
+    staffList = await API.getAdminStaff();
   } catch (err) {
     staffList = [];
     noteOfflineFallback();
@@ -183,7 +183,7 @@ function renderStaffGrid() {
       <span class="badge ${statusBadge[s.status] || 'badge-gray'}">${statusLabel[s.status] || s.status}</span>
       <div class="staff-count">วันนี้: <strong>${s.todayCount || 0} คิว</strong></div>
       <div style="font-size:12px;color:var(--slate);margin-top:6px">
-        <i class="fa-solid fa-envelope"></i> ${s.email || '<span style="color:var(--status-cancel-text)">ยังไม่มีอีเมล</span>'}
+        <i class="fa-solid fa-phone"></i> ${s.phone || '<span style="color:var(--slate)">ยังไม่มีเบอร์ติดต่อ</span>'}
       </div>
       <select class="staff-status-select" onchange="changeStaffStatus('${s.id}', this.value)">
         ${Object.entries(statusLabel).map(([value, label]) => `<option value="${value}" ${s.status === value ? 'selected' : ''}>${label}</option>`).join('')}
@@ -250,7 +250,7 @@ function openStaffModal(staff) {
   document.getElementById('staff-modal-title').textContent = staff ? 'แก้ไขข้อมูลหมอนวด' : 'เพิ่มหมอนวดใหม่';
   document.getElementById('staff-modal-id').value         = staff?.id || '';
   document.getElementById('staff-modal-name').value       = staff?.name || '';
-  document.getElementById('staff-modal-email').value      = staff?.email || '';
+  document.getElementById('staff-modal-phone').value      = staff?.phone || '';
   document.getElementById('staff-modal-experience').value = staff?.experience || '';
   document.getElementById('staff-modal-photo').value      = staff?.photo || '';
   staffImageInput.value = '';
@@ -300,7 +300,7 @@ staffModalForm.addEventListener('submit', async (e) => {
 
     const data = {
       name:       document.getElementById('staff-modal-name').value.trim(),
-      email:      document.getElementById('staff-modal-email').value.trim(),
+      phone:      document.getElementById('staff-modal-phone').value.trim(),
       experience: document.getElementById('staff-modal-experience').value.trim(),
       photo:      photoUrl,
     };

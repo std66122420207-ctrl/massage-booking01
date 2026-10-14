@@ -125,39 +125,17 @@ Cloud Scheduler ทำงานได้หลัง deploy; การแจ้�
 ### รอบ 4: แอดมินแก้ไข/เพิ่มข้อมูลหมอนวด + ปรับ UI ให้ตรงตามภาพตัวอย่าง
 - เพิ่มฟิลด์ `photo` (URL รูปภาพ) ให้หมอนวด — แสดงเป็นรูปวงกลมแทนไอคอนถ้ามี
 - หน้า "แพทย์/หมอนวด" มีปุ่ม "+ เพิ่มหมอนวดใหม่" และปุ่ม "แก้ไขข้อมูล" ต่อการ์ด เปิดเป็นฟอร์ม modal
-  (ชื่อ, อีเมล, ประสบการณ์, URL รูปภาพ) แทนที่จะพิมพ์ผ่าน prompt
-- ย้ายปุ่ม "Sync to Google Sheets" และ "Email หมอนวด" ไปไว้ที่แถบด้านบน (topbar) ให้ตรงกับภาพตัวอย่าง
+  (ชื่อ, เบอร์ติดต่อ, ประสบการณ์, URL รูปภาพ) แทนที่จะพิมพ์ผ่าน prompt
+- ช่องข้อมูลหมอนวดใช้เบอร์ติดต่อสำหรับเจ้าหน้าที่ติดต่อโดยตรง ไม่มีการส่งอีเมลแจ้งคิว
 - เพิ่มการ์ดสถิติ "หมอนวดทั้งหมด" และ "รอการยืนยัน" ในหน้า Dashboard
 
-### รอบ 3: Google Sheets sync + ส่งอีเมลหมอนวด + เบอร์โทรสำรอง + ยืนยันการแจ้งเตือน
-- **Admin:** ปุ่ม "Sync to Google Sheets" — ซิงค์รายการจองทั้งหมดไปที่ Google Sheets (`POST /api/admin/sync-sheets`)
-- **Admin:** ปุ่ม "Email หมอนวด" — ส่งอีเมลแจ้งคิวให้หมอนวดแต่ละคน โดยแยกเฉพาะคิวของตัวเอง ไม่ปนกับคนอื่น (`POST /api/admin/notify-therapists`)
+### รอบ 3: เบอร์ติดต่อหมอนวด + ยืนยันการแจ้งเตือน
 - **User:** ทุกบัญชีต้องมีเบอร์โทรในโปรไฟล์เพื่อให้แอดมินติดต่อได้กรณีแอปแจ้งเตือนไม่ถึง
 - **User:** เพิ่มระบบแจ้งเตือน + ปุ่มกดยืนยันว่าเห็นแล้ว (`GET/POST /api/notifications`) — ถ้าผู้ใช้ไม่กดยืนยัน แอดมินจะเห็นสถานะ "ยังไม่ยืนยัน" พร้อมเบอร์โทรใน `GET /api/notifications/admin/all`
-- เพิ่มฟิลด์ `email` ให้หมอนวด (`staff` collection) พร้อม endpoint จัดการ (`POST/PATCH /api/staff`)
+- เพิ่มฟิลด์ `phone` สำหรับเบอร์ติดต่อหมอนวด (`staff` collection) พร้อม endpoint จัดการ (`POST/PATCH /api/staff`); หน้าสำหรับผู้ใช้ทั่วไปไม่ส่งคืนเบอร์ติดต่อส่วนนี้
 
-#### ตั้งค่า Google Sheets
-1. ไปที่ https://console.cloud.google.com/ → สร้างโปรเจคใหม่ (หรือใช้โปรเจค Firebase เดิมก็ได้ เพราะ Firebase project เป็น Google Cloud project อยู่แล้ว)
-2. เปิดใช้งาน **Google Sheets API**: เมนู "APIs & Services" → "Enable APIs and Services" → ค้นหา "Google Sheets API" → Enable
-3. สร้าง Service Account: "APIs & Services" → "Credentials" → "Create Credentials" → "Service Account" → ตั้งชื่ออะไรก็ได้ → Create and Continue → Done
-4. เปิด Service Account ที่สร้าง → แท็บ "Keys" → "Add Key" → "Create new key" → เลือก JSON → ดาวน์โหลดไฟล์
-5. เปิดไฟล์ JSON ที่ดาวน์โหลด จะเจอ `client_email` และ `private_key` → เอาไปใส่ใน `.env`:
-   - `GOOGLE_SHEETS_CLIENT_EMAIL` = ค่า `client_email`
-   - `GOOGLE_SHEETS_PRIVATE_KEY` = ค่า `private_key` (ใส่ทั้งหมดรวม `\n` ในเครื่องหมายคำพูด)
-6. สร้าง Google Sheet ใหม่ → ตั้งชื่อ tab (sheet) แรกว่า `Bookings` → ก็อป spreadsheet ID จาก URL
-   (เช่น `docs.google.com/spreadsheets/d/`**`นี่คือ-spreadsheet-id`**`/edit`) → ใส่ใน `GOOGLE_SHEETS_SPREADSHEET_ID`
-7. **สำคัญ:** เปิด Google Sheet นั้น → กด "Share" → เอาอีเมลจาก `client_email` (ขั้นตอน 5) ไปแชร์แบบ "Editor" — ไม่งั้น service account จะเข้าไม่ถึงชีต
-
-#### ตั้งค่าอีเมล (Gmail App Password)
-1. เข้า https://myaccount.google.com/security
-2. เปิด **2-Step Verification** ให้เรียบร้อยก่อน (ถ้ายังไม่เปิด จะสร้าง App Password ไม่ได้)
-3. ไปที่ https://myaccount.google.com/apppasswords
-4. ตั้งชื่อ (เช่น "massage-booking-server") → Create → จะได้รหัส 16 หลัก
-5. ใส่ใน `.env`:
-   - `GMAIL_USER` = อีเมล Gmail ของคุณ
-   - `GMAIL_APP_PASSWORD` = รหัส 16 หลักที่ได้ (ใส่ตามที่แสดง มีเว้นวรรคได้)
-
-**หมายเหตุ:** ทั้งสองอย่างนี้ไม่ตั้งก็รันระบบได้ปกติ (ปุ่มจะแจ้ง error สุภาพๆ ว่ายังไม่ได้ตั้งค่า แทนที่จะพังทั้งระบบ)
+**หมายเหตุ:** เบอร์ติดต่อหมอนวดใช้สำหรับเจ้าหน้าที่ติดต่อโดยตรงเท่านั้น ระบบไม่ได้ส่ง SMS อัตโนมัติไปยังหมอนวด
+ข้อมูลอีเมลหมอนวดเดิมจะไม่ถูกแปลงเป็นเบอร์โทรโดยอัตโนมัติ ผู้ดูแลต้องกรอกหมายเลขจริงให้แต่ละราย; เมื่อแก้ไขและบันทึกข้อมูลหมอนวด ระบบจะลบฟิลด์อีเมลเดิมของรายนั้น
 
 ### รอบ 2: เชื่อม Flutter app เข้ากับ backend จริง
 - `AuthService` เปลี่ยนจาก mock (`Future.delayed` + ข้อมูลปลอม) เป็นของจริง:

@@ -30,12 +30,38 @@ function readImageBody(req, res, next) {
 router.get('/', async (req, res) => {
   try {
     const snap  = await db.collection(COLLECTIONS.STAFF).where('active', '==', true).get();
-    const staff = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const staff = snap.docs.map((d) => {
+      const data = { ...d.data() };
+      delete data.email;
+      delete data.phone;
+      return { id: d.id, ...data };
+    });
     res.json(staff);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+// GET /api/staff/admin — Admin: รายชื่อหมอนวดพร้อมเบอร์ติดต่อ
+router.get('/admin', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection(COLLECTIONS.STAFF).where('active', '==', true).get();
+    const staff = snap.docs.map((d) => {
+      const data = { ...d.data() };
+      delete data.email;
+      return { id: d.id, ...data };
+    });
+    res.json(staff);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+function isValidPhone(phone) {
+  if (typeof phone !== 'string') return false;
+  const normalized = phone.trim().replace(/[\s()-]/g, '');
+  return /^\+?\d{8,15}$/.test(normalized);
+}
 
 // POST /api/staff/photo — Admin: upload therapist photo through Firebase Admin SDK
 router.post('/photo', verifyToken, requireAdmin, readImageBody, async (req, res) => {
@@ -105,15 +131,18 @@ router.delete('/:id', verifyToken, requireAdmin, async (req, res) => {
 
 // POST /api/staff — Admin: เพิ่มหมอนวดใหม่
 router.post('/', verifyToken, requireAdmin, async (req, res) => {
-  const { name, email, experience, photo } = req.body;
+  const { name, phone, experience, photo } = req.body;
   if (!name) return res.status(400).json({ error: 'กรุณาระบุชื่อ' });
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' });
+  if (Object.hasOwn(req.body, 'email')) {
+    return res.status(400).json({ error: 'เลิกใช้ช่องอีเมลหมอนวดแล้ว กรุณาระบุเบอร์ติดต่อแทน' });
+  }
+  if (phone !== undefined && phone !== null && phone !== '' && !isValidPhone(phone)) {
+    return res.status(400).json({ error: 'รูปแบบเบอร์ติดต่อไม่ถูกต้อง' });
   }
   try {
     const doc = await db.collection(COLLECTIONS.STAFF).add({
       name,
-      email: email || null,
+      phone: phone?.trim() || null,
       experience: experience || '',
       photo: photo || null, // URL รูปภาพ (เช่น อัปโหลดไป Firebase Storage แล้วใส่ URL ที่นี่)
       status: 'available',
@@ -127,19 +156,23 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/staff/:id — Admin: แก้ไขข้อมูลหมอนวด (ชื่อ, อีเมล, รูป, ประสบการณ์, สถานะใช้งาน)
+// PATCH /api/staff/:id — Admin: แก้ไขข้อมูลหมอนวด
 router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
-  const { name, email, experience, active, photo } = req.body;
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' });
+  const { name, phone, experience, active, photo } = req.body;
+  if (Object.hasOwn(req.body, 'email')) {
+    return res.status(400).json({ error: 'เลิกใช้ช่องอีเมลหมอนวดแล้ว กรุณาระบุเบอร์ติดต่อแทน' });
+  }
+  if (phone !== undefined && phone !== null && phone !== '' && !isValidPhone(phone)) {
+    return res.status(400).json({ error: 'รูปแบบเบอร์ติดต่อไม่ถูกต้อง' });
   }
   try {
     const updates = {};
     if (name !== undefined)       updates.name = name;
-    if (email !== undefined)      updates.email = email;
+    if (phone !== undefined)      updates.phone = typeof phone === 'string' && phone.trim() ? phone.trim() : null;
     if (experience !== undefined) updates.experience = experience;
     if (active !== undefined)     updates.active = active;
     if (photo !== undefined)      updates.photo = photo;
+    updates.email = admin.firestore.FieldValue.delete();
     await db.collection(COLLECTIONS.STAFF).doc(req.params.id).update(updates);
     res.json({ success: true });
   } catch (err) {

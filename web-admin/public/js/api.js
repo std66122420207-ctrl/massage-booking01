@@ -32,8 +32,10 @@ const API = {
     return this._request('/services');
   },
 
-  async getStaff() {
-    return this._request('/staff');
+  async getAdminStaff() {
+    return this._request('/staff/admin', {
+      headers: await this._headers(),
+    });
   },
 
   async uploadStaffPhoto(file) {
@@ -97,14 +99,6 @@ const API = {
   async createBooking(data) {
     return this._request('/bookings', {
       method: 'POST',
-      headers: await this._headers(),
-      body: JSON.stringify(data),
-    });
-  },
-
-  async updateBooking(id, data) {
-    return this._request(`/bookings/${id}`, {
-      method: 'PATCH',
       headers: await this._headers(),
       body: JSON.stringify(data),
     });

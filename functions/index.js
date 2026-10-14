@@ -10,7 +10,7 @@ exports.api = onRequest({
   region: 'asia-southeast1',
   maxInstances: 10,
   timeoutSeconds: 60,
-}, app);
+}, (request, response) => app(request, response));
 
 exports.autoCallWorker = onSchedule({
   schedule: 'every 1 minutes',
