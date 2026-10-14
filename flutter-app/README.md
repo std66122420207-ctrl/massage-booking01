@@ -18,7 +18,7 @@
    flutterfire configure --project=massage-booking-ce032
    ```
 
-   `lib/firebase_options.dart` มีค่า Android/iOS placeholder อยู่ ต้องรัน `flutterfire configure` ก่อนใช้งานบน platform เหล่านั้น ส่วน Web ใช้ค่า Firebase project ที่ตั้งไว้ในไฟล์แล้ว
+   `lib/firebase_options.dart` ตั้งค่า Web และ Android ของโปรเจกต์นี้แล้ว แต่ `google-services.json` ถูก ignore โดย Git และต้องสร้างในเครื่องด้วย `flutterfire configure` ก่อน build Android จาก clone ใหม่ ส่วน iOS ยังต้องตั้งค่าด้วยคำสั่งเดียวกันก่อนใช้งาน; Web ใช้ค่า Firebase project ที่ตั้งไว้ในไฟล์แล้ว
 
 หน้าล็อกอินมีสมัครสมาชิก เข้าสู่ระบบ และส่งอีเมลตั้งรหัสผ่านใหม่ บัญชีใหม่ต้องกรอกชื่อ เลขบัตรประชาชน 13 หลัก เบอร์โทร อีเมล และรหัสผ่านอย่างน้อย 6 ตัวอักษร
 
