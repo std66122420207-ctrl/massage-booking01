@@ -137,6 +137,26 @@ function noteOfflineFallback() {
   showToast('เชื่อมต่อ server ไม่ได้ ข้อมูลจะแสดงเมื่อเชื่อมต่อสำเร็จ');
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+}
+
+function safeImageUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
 // ── Load initial data ──────────────────────────────────────
 async function loadServices() {
   try {
@@ -149,7 +169,7 @@ async function loadServices() {
 
   const sel = document.getElementById('f-service');
   sel.innerHTML = services.map(s =>
-    `<option value="${s.id}">${s.name} (${s.duration} นาที) – ${s.price} ฿</option>`
+    `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} (${escapeHtml(s.duration)} นาที) – ${escapeHtml(s.price)} ฿</option>`
   ).join('');
 }
 
@@ -163,7 +183,9 @@ async function loadStaff() {
   }
 
   const sel = document.getElementById('f-staff');
-  sel.innerHTML = staffList.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  sel.innerHTML = staffList
+    .filter(s => (s.status || 'available') === 'available')
+    .map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');
 
   renderStaffGrid();
 }
@@ -173,28 +195,47 @@ function renderStaffGrid() {
   const statusLabel = { available: 'ว่าง', busy: 'ไม่ว่าง', break: 'หยุด', off: 'ลา' };
   const statusBadge = { available: 'badge-green', busy: 'badge-blue', break: 'badge-yellow', off: 'badge-gray' };
 
-  grid.innerHTML = staffList.map(s => `
+  grid.innerHTML = staffList.map(s => {
+    const photoUrl = safeImageUrl(s.photo);
+    return `
     <div class="staff-card">
-      ${s.photo
-        ? `<img class="staff-photo-img" src="${s.photo}" alt="${s.name}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'staff-avatar',innerHTML:'<i class=\\'fa-solid fa-user\\'></i>'}))">`
+      ${photoUrl
+        ? `<img class="staff-photo-img" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(s.name)}">`
         : `<div class="staff-avatar"><i class="fa-solid fa-user"></i></div>`}
-      <div class="staff-name">${s.name}</div>
-      <div class="staff-exp">ประสบการณ์ ${s.experience || '-'}</div>
-      <span class="badge ${statusBadge[s.status] || 'badge-gray'}">${statusLabel[s.status] || s.status}</span>
-      <div class="staff-count">วันนี้: <strong>${s.todayCount || 0} คิว</strong></div>
+      <div class="staff-name">${escapeHtml(s.name)}</div>
+      <div class="staff-exp">ประสบการณ์ ${escapeHtml(s.experience || '-')}</div>
+      <span class="badge ${statusBadge[s.status] || 'badge-gray'}">${escapeHtml(statusLabel[s.status] || s.status)}</span>
+      <div class="staff-count">วันนี้: <strong>${escapeHtml(s.todayCount || 0)} คิว</strong></div>
       <div style="font-size:12px;color:var(--slate);margin-top:6px">
-        <i class="fa-solid fa-phone"></i> ${s.phone || '<span style="color:var(--slate)">ยังไม่มีเบอร์ติดต่อ</span>'}
+        <i class="fa-solid fa-phone"></i> ${s.phone ? escapeHtml(s.phone) : '<span style="color:var(--slate)">ยังไม่มีเบอร์ติดต่อ</span>'}
       </div>
-      <select class="staff-status-select" onchange="changeStaffStatus('${s.id}', this.value)">
+      <select class="staff-status-select" data-staff-id="${escapeHtml(s.id)}" aria-label="เปลี่ยนสถานะ ${escapeHtml(s.name)}">
         ${Object.entries(statusLabel).map(([value, label]) => `<option value="${value}" ${s.status === value ? 'selected' : ''}>${label}</option>`).join('')}
       </select>
       <div class="staff-actions">
-        <button type="button" class="action-btn btn-edit" data-staff-action="edit" data-staff-id="${s.id}"><i class="fa-solid fa-pen"></i> แก้ไข</button>
-        <button type="button" class="action-btn btn-cancel" data-staff-action="delete" data-staff-id="${s.id}"><i class="fa-solid fa-trash"></i> ลบ</button>
+        <button type="button" class="action-btn btn-edit" data-staff-action="edit" data-staff-id="${escapeHtml(s.id)}"><i class="fa-solid fa-pen"></i> แก้ไข</button>
+        <button type="button" class="action-btn btn-cancel" data-staff-action="delete" data-staff-id="${escapeHtml(s.id)}"><i class="fa-solid fa-trash"></i> ลบ</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
+
+document.getElementById('staff-grid').addEventListener('error', (event) => {
+  const image = event.target.closest('img.staff-photo-img');
+  if (!image) return;
+  const fallback = document.createElement('div');
+  fallback.className = 'staff-avatar';
+  const icon = document.createElement('i');
+  icon.className = 'fa-solid fa-user';
+  fallback.append(icon);
+  image.replaceWith(fallback);
+}, true);
+
+document.getElementById('staff-grid').addEventListener('change', (event) => {
+  const select = event.target.closest('select[data-staff-id]');
+  if (select) changeStaffStatus(select.dataset.staffId, select.value);
+});
 
 document.getElementById('staff-grid').addEventListener('click', (event) => {
   const button = event.target.closest('button[data-staff-action]');
@@ -360,13 +401,13 @@ function renderDashboardBookings() {
   document.getElementById('dashboard-bookings-count').textContent = `${list.length} รายการ`;
   tbody.innerHTML = list.map(b => `
     <tr>
-      <td class="queue-id">${b.queueNumber || '-'}</td>
-      <td>${b.timeSlot || '-'}</td>
-      <td>${b.customerName || b.userName || '-'}</td>
-      <td>${b.customerPhone || '-'}</td>
-      <td>${b.serviceName || '-'}</td>
-      <td>${b.staffName || '-'}</td>
-      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
+      <td class="queue-id">${escapeHtml(b.queueNumber || '-')}</td>
+      <td>${escapeHtml(b.timeSlot || '-')}</td>
+      <td>${escapeHtml(b.customerName || b.userName || '-')}</td>
+      <td>${escapeHtml(b.customerPhone || '-')}</td>
+      <td>${escapeHtml(b.serviceName || '-')}</td>
+      <td>${escapeHtml(b.staffName || '-')}</td>
+      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${escapeHtml(STATUS_LABEL[b.status] || b.status)}</span></td>
     </tr>
   `).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
 }
@@ -380,18 +421,18 @@ function renderBookingsTable() {
 
   tbody.innerHTML = list.map(b => `
     <tr>
-      <td class="queue-id">${b.queueNumber}</td>
-      <td>${b.timeSlot}</td>
-      <td>${b.customerName || b.userName || '-'}</td>
-      <td>${b.customerPhone || '-'}</td>
-      <td><span class="badge badge-right">${b.healthcareRightLabel || 'จ่ายตรง'}</span></td>
+      <td class="queue-id">${escapeHtml(b.queueNumber || '-')}</td>
+      <td>${escapeHtml(b.timeSlot || '-')}</td>
+      <td>${escapeHtml(b.customerName || b.userName || '-')}</td>
+      <td>${escapeHtml(b.customerPhone || '-')}</td>
+      <td><span class="badge badge-right">${escapeHtml(b.healthcareRightLabel || 'จ่ายตรง')}</span></td>
       <td>${b.channel === 'walk-in' ? 'Walk-in' : b.channel === 'web' ? 'Web' : 'App'}</td>
-      <td>${b.serviceName}</td>
-      <td>${b.staffName || '-'}</td>
-      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
+      <td>${escapeHtml(b.serviceName || '-')}</td>
+      <td>${escapeHtml(b.staffName || '-')}</td>
+      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${escapeHtml(STATUS_LABEL[b.status] || b.status)}</span></td>
       <td>
-        ${b.status === 'in_service' ? `<button class="action-btn btn-done" onclick="markDone('${b.id}')">เสร็จ</button>` : ''}
-        ${CANCELLABLE_STATUSES.includes(b.status) ? `<button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>` : ''}
+        ${b.status === 'in_service' ? `<button class="action-btn btn-done" data-booking-action="complete" data-booking-id="${escapeHtml(b.id)}">เสร็จ</button>` : ''}
+        ${CANCELLABLE_STATUSES.includes(b.status) ? `<button class="action-btn btn-cancel" data-booking-action="cancel" data-booking-id="${escapeHtml(b.id)}">ยกเลิก</button>` : ''}
       </td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
@@ -406,16 +447,16 @@ function renderUpcomingBookings() {
   document.getElementById('upcoming-bookings-count').textContent = `${list.length} รายการ`;
   tbody.innerHTML = list.map(b => `
     <tr>
-      <td>${b.bookingDate || '-'}</td>
-      <td class="queue-id">${b.queueNumber || '-'}</td>
-      <td>${b.timeSlot || '-'}</td>
-      <td>${b.customerName || b.userName || '-'}</td>
-      <td>${b.customerPhone || '-'}</td>
-      <td>${b.serviceName || '-'}</td>
-      <td>${b.staffName || '-'}</td>
-      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${STATUS_LABEL[b.status] || b.status}</span></td>
+      <td>${escapeHtml(b.bookingDate || '-')}</td>
+      <td class="queue-id">${escapeHtml(b.queueNumber || '-')}</td>
+      <td>${escapeHtml(b.timeSlot || '-')}</td>
+      <td>${escapeHtml(b.customerName || b.userName || '-')}</td>
+      <td>${escapeHtml(b.customerPhone || '-')}</td>
+      <td>${escapeHtml(b.serviceName || '-')}</td>
+      <td>${escapeHtml(b.staffName || '-')}</td>
+      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${escapeHtml(STATUS_LABEL[b.status] || b.status)}</span></td>
       <td>${CANCELLABLE_STATUSES.includes(b.status)
-        ? `<button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>`
+        ? `<button class="action-btn btn-cancel" data-booking-action="cancel" data-booking-id="${escapeHtml(b.id)}">ยกเลิก</button>`
         : ''}</td>
     </tr>
   `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--slate);padding:24px">ไม่มีรายการจองในวันที่เลือก</td></tr>';
@@ -456,9 +497,11 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
   if (!name) { showToast('กรุณากรอกชื่อผู้รับบริการ'); return; }
 
   const serviceId = document.getElementById('f-service').value;
-  const service   = services.find(s => s.id === serviceId) || services[0];
   const staffId   = document.getElementById('f-staff').value;
-  const staff     = staffList.find(s => s.id === staffId);
+  if (!serviceId || !staffId) {
+    showToast('กรุณาตรวจสอบว่ามีบริการและหมอนวดที่พร้อมให้บริการ');
+    return;
+  }
   const date      = document.getElementById('f-date').value;
   const time      = document.getElementById('f-time').value;
 
@@ -474,7 +517,7 @@ document.getElementById('booking-form').addEventListener('submit', async (e) => 
     });
     await loadBookings();
     e.target.reset();
-    document.getElementById('f-date').valueAsDate = new Date();
+    document.getElementById('f-date').value = bangkokDate.format(new Date());
     showToast(`เพิ่มการจอง ${result.booking.queueNumber} สำเร็จ ✓`);
   } catch (err) { showToast(`เพิ่มการจองไม่สำเร็จ: ${err.message}`); }
 });
@@ -490,7 +533,7 @@ function renderQueuePage() {
 
   document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
   document.getElementById('queue-current-details').innerHTML = current
-    ? `${current.serviceName || '-'} · ${current.healthcareRightLabel || 'จ่ายตรง'}<br>${current.staffName || '-'} · ${current.timeSlot || '-'}`
+    ? `${escapeHtml(current.serviceName || '-')} · ${escapeHtml(current.healthcareRightLabel || 'จ่ายตรง')}<br>${escapeHtml(current.staffName || '-')} · ${escapeHtml(current.timeSlot || '-')}`
     : 'ยังไม่มีคิวกำลังให้บริการ';
   document.getElementById('queue-waiting-count').textContent = `${waiting.length} คิว`;
   document.getElementById('queue-done-count').textContent    = `${done.length} คิว`;
@@ -498,18 +541,18 @@ function renderQueuePage() {
 
   document.getElementById('queue-tbody').innerHTML = waiting.map(b => `
     <tr>
-      <td class="queue-id">${b.queueNumber}</td>
-      <td>${b.timeSlot}</td>
-      <td>${b.customerName || b.userName || '-'}</td>
-      <td>${b.customerPhone || '-'}</td>
-      <td><span class="badge badge-right">${b.healthcareRightLabel || 'จ่ายตรง'}</span></td>
+      <td class="queue-id">${escapeHtml(b.queueNumber || '-')}</td>
+      <td>${escapeHtml(b.timeSlot || '-')}</td>
+      <td>${escapeHtml(b.customerName || b.userName || '-')}</td>
+      <td>${escapeHtml(b.customerPhone || '-')}</td>
+      <td><span class="badge badge-right">${escapeHtml(b.healthcareRightLabel || 'จ่ายตรง')}</span></td>
       <td>${b.channel === 'walk-in' ? 'Walk-in' : b.channel === 'web' ? 'Web' : 'App'}</td>
-      <td>${b.serviceName}</td>
-      <td>${b.staffName || '-'}</td>
-      <td><span class="badge ${STATUS_BADGE[b.status]}">${STATUS_LABEL[b.status]}</span></td>
+      <td>${escapeHtml(b.serviceName || '-')}</td>
+      <td>${escapeHtml(b.staffName || '-')}</td>
+      <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${escapeHtml(STATUS_LABEL[b.status] || b.status)}</span></td>
       <td>
-        <button class="action-btn btn-call" onclick="callSpecific('${b.id}')">เรียก</button>
-        <button class="action-btn btn-cancel" onclick="cancelBooking('${b.id}')">ยกเลิก</button>
+        <button class="action-btn btn-call" data-booking-action="call" data-booking-id="${escapeHtml(b.id)}">เรียก</button>
+        <button class="action-btn btn-cancel" data-booking-action="cancel" data-booking-id="${escapeHtml(b.id)}">ยกเลิก</button>
       </td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
@@ -552,14 +595,33 @@ async function callNext() {
 document.getElementById('btn-call-next').addEventListener('click', callNext);
 document.getElementById('btn-call-next-2').addEventListener('click', callNext);
 
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-booking-action], button[data-notification-action]');
+  if (!button) return;
+
+  const { bookingAction, bookingId, notificationAction, notificationId } = button.dataset;
+  if (bookingAction === 'complete') markDone(bookingId);
+  else if (bookingAction === 'cancel') cancelBooking(bookingId);
+  else if (bookingAction === 'call') callSpecific(bookingId);
+  else if (notificationAction === 'resend') resendNotification(notificationId);
+  else if (notificationAction === 'confirm') confirmNotificationByAdmin(notificationId);
+  else if (notificationAction === 'cancel') cancelNotificationBooking(notificationId);
+});
+
 // ── Notification confirmations (สำหรับกรณีแอปแจ้งเตือนไม่ถึงลูกค้า) ──
+let notificationLoadErrorShown = false;
+
 async function loadNotifications() {
   try {
     const list = await API.getAdminNotifications();
     if (!Array.isArray(list)) return;
+    notificationLoadErrorShown = false;
     renderNotifications(list);
-  } catch {
-    // เงียบไว้ — ไม่ใช่ข้อมูลสำคัญขนาดต้องแจ้ง error ทุกครั้งที่ auto-refresh
+  } catch (err) {
+    if (!notificationLoadErrorShown) {
+      notificationLoadErrorShown = true;
+      showToast(`โหลดการแจ้งเตือนไม่สำเร็จ: ${err.message}`);
+    }
   }
 }
 
@@ -583,16 +645,16 @@ function renderNotifications(list) {
         : n.confirmed ? 'badge-green' : 'badge-yellow';
     return `
       <tr>
-        <td>${n.message || '-'}</td>
-        <td>${n.customerName || '-'}${n.queueNumber ? `<br><small class="queue-id">${n.queueNumber}</small>` : ''}</td>
-        <td>${n.customerPhone || '-'}</td>
-        <td>${n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : '-'}</td>
+        <td>${escapeHtml(n.message || '-')}</td>
+        <td>${escapeHtml(n.customerName || '-')}${n.queueNumber ? `<br><small class="queue-id">${escapeHtml(n.queueNumber)}</small>` : ''}</td>
+        <td>${escapeHtml(n.customerPhone || '-')}</td>
+        <td>${escapeHtml(n.createdAt?._seconds ? new Date(n.createdAt._seconds * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : '-')}</td>
         <td><span class="badge ${statusClass}">${statusLabel}</span></td>
         <td>
           ${!n.confirmed && !closed
-            ? `<button class="action-btn btn-call" onclick="resendNotification('${n.id}')"><i class="fa-solid fa-bell"></i> แจ้งเตือนอีกครั้ง</button>
-              <button class="action-btn btn-done" onclick="confirmNotificationByAdmin('${n.id}')"><i class="fa-solid fa-check"></i> ยืนยันคิว</button>
-              <button class="action-btn btn-cancel" onclick="cancelNotificationBooking('${n.id}')"><i class="fa-solid fa-xmark"></i> ยกเลิกคิว</button>`
+            ? `<button class="action-btn btn-call" data-notification-action="resend" data-notification-id="${escapeHtml(n.id)}"><i class="fa-solid fa-bell"></i> แจ้งเตือนอีกครั้ง</button>
+              <button class="action-btn btn-done" data-notification-action="confirm" data-notification-id="${escapeHtml(n.id)}"><i class="fa-solid fa-check"></i> ยืนยันคิว</button>
+              <button class="action-btn btn-cancel" data-notification-action="cancel" data-notification-id="${escapeHtml(n.id)}"><i class="fa-solid fa-xmark"></i> ยกเลิกคิว</button>`
             : '<span style="color:var(--slate-light)">-</span>'}
         </td>
       </tr>
@@ -636,12 +698,14 @@ async function renderReport() {
   try {
     const rows = await API.getReport();
     document.getElementById('report-tbody').innerHTML = rows.map(row => `
-      <tr><td>${new Date(`${row.date}T00:00:00`).toLocaleDateString('th-TH', { weekday: 'long' })}</td>
-      <td>${row.total}</td><td>${row.done}</td><td>${row.cancelled}</td>
-      <td>${row.revenue.toLocaleString()} ฿</td></tr>
+      <tr><td>${escapeHtml(new Intl.DateTimeFormat('th-TH', {
+        timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'short',
+      }).format(new Date(`${row.date}T00:00:00.000Z`)))}</td>
+      <td>${escapeHtml(row.total)}</td><td>${escapeHtml(row.done)}</td><td>${escapeHtml(row.cancelled)}</td>
+      <td>${escapeHtml((Number(row.revenue) || 0).toLocaleString())} ฿</td></tr>
     `).join('');
   } catch (err) {
-    document.getElementById('report-tbody').innerHTML = `<tr><td colspan="5">โหลดรายงานไม่สำเร็จ: ${err.message}</td></tr>`;
+    document.getElementById('report-tbody').innerHTML = `<tr><td colspan="5">โหลดรายงานไม่สำเร็จ: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -673,7 +737,7 @@ async function loadSettings() {
 
 // ── Init ────────────────────────────────────────────────────
 async function init() {
-  document.getElementById('f-date').valueAsDate = new Date();
+  document.getElementById('f-date').value = bangkokDate.format(new Date());
 
   await loadServices();
   await loadStaff();

@@ -568,7 +568,7 @@ tbody tr:hover td { background: var(--jade-pale); }
         <div class="card-header"><h4>เพิ่มการจองใหม่</h4></div>
         <form id="booking-form" class="form-grid">
           <div class="form-group"><label>ชื่อผู้รับบริการ</label><input type="text" id="f-name" placeholder="ชื่อ-นามสกุล" required></div>
-          <div class="form-group"><label>เบอร์โทร</label><input type="text" id="f-phone" placeholder="08X-XXX-XXXX"></div>
+          <div class="form-group"><label for="f-phone">เบอร์โทร</label><input type="tel" id="f-phone" autocomplete="tel" inputmode="tel" placeholder="081-234-5678" maxlength="20" pattern="(?:\+|[0-9])(?=(?:[^0-9]*[0-9]){7,14}[^0-9]*$)[0-9 \(\)\-]{7,19}" title="กรอกหมายเลขโทรศัพท์ 8–15 หลัก"></div>
           <div class="form-group"><label>สิทธิการรักษา</label><select id="f-right"><option value="universal">บัตรทอง</option><option value="social_security">ประกันสังคม</option><option value="direct">จ่ายตรง / ชำระเอง</option></select></div>
           <div class="form-group"><label>เลขบัตรประชาชน / Member ID</label><input type="text" id="f-national-id" maxlength="13" placeholder="ใช้ตรวจสิทธิซ้ำรายวัน"></div>
           <div class="form-group"><label>บริการ</label><select id="f-service"></select></div>
@@ -731,7 +731,7 @@ tbody tr:hover td { background: var(--jade-pale); }
     </div>
     <div class="form-group">
       <label for="staff-modal-phone">เบอร์ติดต่อหมอนวด</label>
-      <input type="tel" id="staff-modal-phone" autocomplete="tel" inputmode="tel" placeholder="เช่น 0812345678" pattern="[+0-9][0-9 ()-]{7,19}" title="กรอกหมายเลขโทรศัพท์ 8–15 หลัก">
+      <input type="tel" id="staff-modal-phone" autocomplete="tel" inputmode="tel" placeholder="เช่น 0812345678" maxlength="20" pattern="(?:\+|[0-9])(?=(?:[^0-9]*[0-9]){7,14}[^0-9]*$)[0-9 \(\)\-]{7,19}" title="กรอกหมายเลขโทรศัพท์ 8–15 หลัก">
     </div>
     <div class="form-group">
       <label>ประสบการณ์</label>

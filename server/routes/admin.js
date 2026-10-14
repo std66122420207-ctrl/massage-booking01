@@ -2,7 +2,16 @@ const express = require('express');
 const router  = express.Router();
 const { db, COLLECTIONS } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { getBangkokDate } = require('../services/bookingPolicy');
 const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue } = require('../services/firestoreGuard');
+
+function getReportDates(now = new Date()) {
+  const today = getBangkokDate(now);
+  const todayUtc = Date.parse(`${today}T00:00:00.000Z`);
+  return Array.from({ length: 7 }, (_, index) => (
+    new Date(todayUtc - (6 - index) * 86400000).toISOString().slice(0, 10)
+  ));
+}
 
 function isBookingCounted(booking) {
   return !!booking && booking.status !== 'cancelled';
@@ -36,19 +45,14 @@ router.get('/report', async (req, res) => {
   }
 
   try {
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(start.getDate() - 6);
-    const from = start.toISOString().slice(0, 10);
-    const to = end.toISOString().slice(0, 10);
+    const dates = getReportDates();
+    const from = dates[0];
+    const to = dates[dates.length - 1];
     const snap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('bookingDate', '>=', from).where('bookingDate', '<=', to).get();
-    const byDate = {};
-    for (let i = 0; i < 7; i += 1) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
-      byDate[date.toISOString().slice(0, 10)] = { total: 0, done: 0, cancelled: 0, revenue: 0 };
-    }
+    const byDate = Object.fromEntries(dates.map((date) => [
+      date, { total: 0, done: 0, cancelled: 0, revenue: 0 },
+    ]));
     snap.docs.forEach((doc) => {
       const booking = doc.data();
       const row = byDate[booking.bookingDate];
@@ -80,6 +84,7 @@ router.get('/report', async (req, res) => {
 module.exports = router;
 module.exports.isBookingCounted = isBookingCounted;
 module.exports.summarizeBookingCounts = summarizeBookingCounts;
+module.exports.getReportDates = getReportDates;
 
 router.get('/settings', async (req, res) => {
   const cacheKey = 'admin:settings:general';

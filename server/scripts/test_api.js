@@ -6,7 +6,7 @@ require('dotenv').config();
 process.env.NODE_ENV = 'test';
 const http = require('http');
 const app  = require('../index');
-const { isBookingCounted, summarizeBookingCounts } = require('../routes/admin');
+const { isBookingCounted, summarizeBookingCounts, getReportDates } = require('../routes/admin');
 
 async function runTests() {
   const PORT = 4321;
@@ -152,6 +152,18 @@ async function runTests() {
       const summary = summarizeBookingCounts(items);
       if (summary.total !== 3) throw new Error(`Expected total 3, got ${summary.total}`);
       if (summary.cancelled !== 0) throw new Error(`Expected cancelled count 0, got ${summary.cancelled}`);
+    });
+
+    await test('Admin report dates use Bangkok calendar days', async () => {
+      if (typeof getReportDates !== 'function') throw new Error('Expected getReportDates helper export');
+      const dates = getReportDates(new Date('2026-10-13T17:30:00.000Z'));
+      const expected = [
+        '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11',
+        '2026-10-12', '2026-10-13', '2026-10-14',
+      ];
+      if (JSON.stringify(dates) !== JSON.stringify(expected)) {
+        throw new Error(`Expected Bangkok report dates ${expected.join(', ')}, got ${dates.join(', ')}`);
+      }
     });
 
     // 7. 404 handler
