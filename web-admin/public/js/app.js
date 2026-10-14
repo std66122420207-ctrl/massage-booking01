@@ -189,12 +189,26 @@ function renderStaffGrid() {
         ${Object.entries(statusLabel).map(([value, label]) => `<option value="${value}" ${s.status === value ? 'selected' : ''}>${label}</option>`).join('')}
       </select>
       <div class="staff-actions">
-        <button class="action-btn btn-edit" onclick='openStaffModal(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="fa-solid fa-pen"></i> แก้ไข</button>
-        <button class="action-btn btn-cancel" onclick='removeStaff(${JSON.stringify(s.id)}, ${JSON.stringify(s.name)})'><i class="fa-solid fa-trash"></i> ลบ</button>
+        <button type="button" class="action-btn btn-edit" data-staff-action="edit" data-staff-id="${s.id}"><i class="fa-solid fa-pen"></i> แก้ไข</button>
+        <button type="button" class="action-btn btn-cancel" data-staff-action="delete" data-staff-id="${s.id}"><i class="fa-solid fa-trash"></i> ลบ</button>
       </div>
     </div>
   `).join('');
 }
+
+document.getElementById('staff-grid').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-staff-action]');
+  if (!button) return;
+
+  const staff = staffList.find((item) => item.id === button.dataset.staffId);
+  if (!staff) return;
+
+  if (button.dataset.staffAction === 'edit') {
+    openStaffModal(staff);
+  } else if (button.dataset.staffAction === 'delete') {
+    removeStaff(staff.id, staff.name);
+  }
+});
 
 // ── Staff Add/Edit Modal ─────────────────────────────────────
 const staffModalOverlay = document.getElementById('staff-modal-overlay');
