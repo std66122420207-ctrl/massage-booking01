@@ -166,7 +166,9 @@ if (require.main === module) {
     console.log(`   API  → http://localhost:${PORT}/api`);
     console.log(`   Admin→ http://localhost:${PORT}\n`);
   });
-  startAutoCallWorker();
+  if (process.env.ENABLE_AUTO_CALL_WORKER !== 'false') {
+    startAutoCallWorker();
+  }
 }
 
 // ── Graceful shutdown ────────────────────────────────────────

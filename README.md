@@ -21,52 +21,40 @@ npm run test:booking-concurrency
 
 > คำสั่งเหล่านี้ช่วยให้รันจาก root ของโปรเจคได้โดยตรง ไม่ต้องเข้าไปใน subfolder เองทุกครั้ง
 > การทดสอบการจองชนกันใช้ Firebase Emulator project แยก ไม่แก้ข้อมูลบน Firebase จริง
-## 🚀 เตรียม Deploy ไป Firebase
+## 🚀 Deploy แบบประหยัด: Firebase Spark + Render Free
 
-โปรเจกต์นี้กำหนด Firebase project `massage-booking-ce032` พร้อม Hosting สองเว็บ:
-หน้าแอดมิน `massage-booking-ce032` และแอปลูกค้า `massage-booking-customer`.
-คำสั่งด้านล่าง deploy ทั้ง Cloud Functions, Firestore rules/indexes และ Hosting
-แต่จะหยุดเองหากชุดทดสอบหรือ Flutter Web build ไม่ผ่าน
+เว็บลูกค้าและ Firestore ใช้ Firebase Spark ตามโควต้าฟรี ส่วน Express API และเว็บแอดมิน
+รันบน Render Free (`render.yaml`). Render Free อาจพัก service เมื่อไม่มีผู้ใช้
+ทำให้การเรียกครั้งแรกช้า และไม่มี worker อัตโนมัติที่ทำงานได้ต่อเนื่อง
+ค่า SMS/การยืนยันเบอร์โทรอาจเกิดค่าใช้จ่ายแยกตามผู้ให้บริการ
 
-### ตั้งค่าก่อน Deploy (ทำครั้งเดียว)
+1. เปิดใช้ Firebase Authentication, Firestore และ Cloud Messaging และเพิ่ม
+   `massage-booking-customer.web.app` กับโดเมน Render ใน Authorized domains.
+2. ใน Render เลือก **New → Blueprint** และเชื่อม repository นี้ จากนั้นตั้งค่า
+   `FRONTEND_URL` เป็น `https://massage-booking-customer.web.app`.
+   ตั้ง `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+   (และ `FIREBASE_STORAGE_BUCKET` หากใช้งาน) ใน Render Environment เท่านั้น
+   ห้าม commit service-account key หรือ secret.
+3. ตั้งค่าแอดมิน Firebase Auth ให้มี custom claim `admin: true` ด้วย
+   `node server/scripts/setAdmin.js <อีเมลแอดมิน>`.
+4. หลัง Render service พร้อม คัดลอก public URL ของ service แล้วตั้ง API URL และ
+   Web Push VAPID public key เพื่อ build/deploy หน้าเว็บลูกค้า:
 
-1. เปิดใช้ Firebase Authentication (Email/Password และ Phone), Firestore, Storage,
-   Cloud Messaging และเปิด Billing plan ที่รองรับ Cloud Scheduler/Cloud Functions
-   สำหรับ worker ที่ทำงานทุก 1 นาที
-   เพิ่ม `massage-booking-ce032.web.app` และ `massage-booking-customer.web.app` ใน
-   Authentication → Settings → Authorized domains ด้วย
-2. สร้างผู้ใช้แอดมินใน Firebase Authentication แล้วกำหนด custom claim `admin: true`
-   ด้วย `node server/scripts/setAdmin.js <อีเมลแอดมิน>`.
-3. สร้างไฟล์ `.env.massage-booking-ce032` ที่ root ของ repository และกำหนด origin
-   ของเว็บที่อนุญาตให้เรียก API:
-
-   ```dotenv
-   FRONTEND_URL=https://massage-booking-ce032.web.app,https://massage-booking-customer.web.app
+   ```powershell
+   $env:API_BASE_URL = Read-Host "Render service URL (เช่น https://<service>.onrender.com)"
+   $env:FCM_VAPID_KEY = Read-Host "Firebase Web Push public VAPID key"
+   firebase deploy --only hosting:customer --project massage-booking-ce032
    ```
 
-   ไฟล์ `.env.*` ถูกเพิ่มใน ignore rules แล้ว ห้าม commit secret หรือ service-account key
-   เข้า repository.
-4. เปิด Firebase Console → Project settings → Cloud Messaging → Web Push certificates
-   แล้วเตรียม public VAPID key สำหรับ build ของแอปลูกค้า (เป็น public key ไม่ใช่ private key).
+   สคริปต์ build จะเติม `/api` ให้ API URL โดยอัตโนมัติ. เว็บแอดมินอยู่ที่ URL
+   ของ Render service; เว็บลูกค้าอยู่ที่ `https://massage-booking-customer.web.app`.
+   Deploy Firestore rules/indexes แยกได้ด้วย
+   `firebase deploy --only firestore:rules,firestore:indexes --project massage-booking-ce032`.
 
-### ตรวจสอบและ Deploy
-
-```powershell
-firebase login
-firebase use massage-booking-ce032
-$env:FCM_VAPID_KEY = Read-Host "Paste the Web Push public VAPID key"
-npm run predeploy:firebase
-npm run test:booking-concurrency
-npm audit --omit=dev
-npm run analyze:flutter
-npm run test:flutter
-firebase deploy --only functions,firestore:rules,firestore:indexes,hosting
-```
-
-ก่อนปล่อยจริงให้ทดสอบล็อกอิน/จอง/ยกเลิก/แจ้งเตือน และยืนยันว่า
-Cloud Scheduler ทำงานได้หลัง deploy; การแจ้งเตือนผ่าน SMS ต้องตั้งค่า Twilio เพิ่ม
-การ deploy เป็นขั้นตอนที่ผู้ดูแลต้องเรียกใช้เอง; การตรวจสอบในเครื่องไม่เปลี่ยน
-ทรัพยากรบน Firebase.
+โหมดฟรีนี้ปิด `autoCallWorker` โดยตั้งใจ: การแจ้งเตือนเตือนนัด, auto-confirm,
+ยกเลิก no-show และ auto-complete จะไม่ทำงานเป็นรอบทุกนาทีบน Render Free
+หากต้องการ automation ต่อเนื่องหรือ Cloud Functions ให้เปลี่ยนเป็น Firebase Blaze
+และใช้ขั้นตอน deploy Functions แยกต่างหาก.
 ## �📝 การแก้ไขล่าสุด (Changelog)
 
 ### รอบ 9: ตรวจสอบผ่านในเครื่อง (ยังไม่ได้ Deploy)
