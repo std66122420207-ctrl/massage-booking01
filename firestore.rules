@@ -9,13 +9,17 @@ service cloud.firestore {
       allow create: if request.auth != null &&
                       request.auth.uid == userId &&
                       request.resource.data.uid == userId &&
-                      request.resource.data.role == 'user';
+                      request.resource.data.role == 'user' &&
+                      (!request.resource.data.keys().hasAny(['email']) ||
+                       request.resource.data.email == request.auth.token.get('email', null)) &&
+                      (!request.resource.data.keys().hasAny(['phone']) ||
+                       request.resource.data.phone == request.auth.token.get('phone_number', null));
       allow update: if request.auth != null &&
                       ((request.auth.uid == userId &&
                         request.resource.data.uid == resource.data.uid &&
                         request.resource.data.role == resource.data.role &&
                         request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['name', 'citizenId', 'email', 'phone', 'updatedAt'])) ||
+                          .hasOnly(['name', 'citizenId', 'updatedAt'])) ||
                        request.auth.token.admin == true);
       allow delete: if request.auth != null && request.auth.token.admin == true;
     }

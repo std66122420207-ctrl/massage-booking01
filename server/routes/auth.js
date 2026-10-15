@@ -1,28 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { db, COLLECTIONS, admin } = require('../config/firebase');
+const { db, COLLECTIONS } = require('../config/firebase');
 const { verifyToken } = require('../middleware/auth');
+const { isValidThaiMobilePhone, normalizeThaiMobilePhone } = require('../utils/thaiMobilePhone');
+const { RegistrationConflictError, saveUserWithUniquePhone } = require('../services/phoneRegistry');
 
 // Flutter uses Firebase Phone Auth; this endpoint stores the verified profile.
 router.post('/register', verifyToken, async (req, res) => {
   const { name, phone } = req.body;
-  if (!name || !phone || !/^0\d{8,9}$/.test(String(phone).replace(/[\s-]/g, ''))) {
-    return res.status(400).json({ error: 'กรุณากรอกชื่อและเบอร์โทรศัพท์ให้ถูกต้อง' });
+  if (!name || !isValidThaiMobilePhone(phone)) {
+    return res.status(400).json({ error: 'กรุณากรอกชื่อและเบอร์มือถือ 10 หลัก โดยขึ้นต้นด้วย 06, 08 หรือ 09' });
   }
 
   try {
-    const normalizedPhone = String(phone).replace(/[\s-]/g, '');
-    await db.collection(COLLECTIONS.USERS).doc(req.user.uid).set({
-      uid: req.user.uid,
-      name,
-      phone: normalizedPhone,
-      loginMethod: 'phone',
+    const normalizedPhone = normalizeThaiMobilePhone(phone);
+    await saveUserWithUniquePhone(req.user.uid, normalizedPhone, {
+      ...(typeof name === 'string' ? { name: name.trim() } : {}),
+      ...(typeof req.body.citizenId === 'string'
+        ? { citizenId: req.body.citizenId.trim() }
+        : {}),
+      ...(typeof req.user.email === 'string' ? { email: req.user.email } : {}),
+      loginMethod: req.user.firebase?.sign_in_provider === 'password' ? 'email' : 'phone',
       role: 'user',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    });
 
     res.json({ success: true, message: 'ลงทะเบียนสำเร็จ' });
   } catch (err) {
+    if (err instanceof RegistrationConflictError) {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -40,16 +46,16 @@ router.get('/me', verifyToken, async (req, res) => {
 
 router.patch('/me', verifyToken, async (req, res) => {
   const { phone } = req.body;
-  if (!phone || !/^0\d{8,9}$/.test(String(phone).replace(/[\s-]/g, ''))) {
-    return res.status(400).json({ error: 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (เช่น 0812345678)' });
+  if (!isValidThaiMobilePhone(phone)) {
+    return res.status(400).json({ error: 'กรุณากรอกเบอร์มือถือ 10 หลัก โดยขึ้นต้นด้วย 06, 08 หรือ 09' });
   }
   try {
-    await db.collection(COLLECTIONS.USERS).doc(req.user.uid).set({
-      phone: String(phone).replace(/[\s-]/g, ''),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    await saveUserWithUniquePhone(req.user.uid, normalizeThaiMobilePhone(phone), {});
     res.json({ success: true });
   } catch (err) {
+    if (err instanceof RegistrationConflictError) {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 });

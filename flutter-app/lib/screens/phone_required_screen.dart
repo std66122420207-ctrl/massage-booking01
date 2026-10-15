@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../utils/thai_mobile_phone.dart';
 
 // ══ Phone Required Screen ══════════════════════════════════════
 // Collects a contact number for existing accounts that do not have one.
@@ -71,9 +72,8 @@ class _PhoneRequiredScreenState extends State<PhoneRequiredScreen> {
                     border: OutlineInputBorder(),
                   ),
                   validator: (v) {
-                    final digits = (v ?? '').replaceAll(RegExp(r'\D'), '');
-                    if (!RegExp(r'^0\d{8,9}$').hasMatch(digits)) {
-                      return 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง';
+                    if (!isValidThaiMobilePhone(v ?? '')) {
+                      return 'กรุณากรอกเบอร์มือถือ 10 หลัก โดยขึ้นต้นด้วย 06, 08 หรือ 09';
                     }
                     return null;
                   },

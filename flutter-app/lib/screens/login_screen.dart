@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
+import '../utils/thai_mobile_phone.dart';
 
 enum _AuthMode { login, register, resetPassword }
 
@@ -55,7 +56,12 @@ class _LoginScreenState extends State<LoginScreen> {
             email: _emailCtrl.text,
             password: _passwordCtrl.text,
           );
-          if (mounted) Navigator.pushReplacementNamed(context, '/home');
+          if (!mounted) return;
+          setState(() => _mode = _AuthMode.login);
+          _showMessage(
+            'สมัครสมาชิกแล้ว กรุณากดลิงก์ยืนยันที่ส่งไปยังอีเมล '
+            'หากไม่พบ โปรดตรวจสอบจดหมายขยะ',
+          );
           break;
         case _AuthMode.resetPassword:
           await auth.sendPasswordResetEmail(_emailCtrl.text);
@@ -65,7 +71,9 @@ class _LoginScreenState extends State<LoginScreen> {
           break;
       }
     } catch (error) {
-      if (mounted) _showMessage(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        _showMessage(error.toString().replaceFirst('Exception: ', ''));
+      }
     }
   }
 
@@ -170,10 +178,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         'เบอร์โทรศัพท์',
                         keyboardType: TextInputType.phone,
                         validator: (value) {
-                          final phone = (value ?? '').replaceAll(
-                              RegExp(r'[\s-]'), '');
-                          if (!RegExp(r'^0\d{8,9}$').hasMatch(phone)) {
-                            return 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง';
+                          if (!isValidThaiMobilePhone(value ?? '')) {
+                            return 'กรุณากรอกเบอร์มือถือ 10 หลัก โดยขึ้นต้นด้วย 06, 08 หรือ 09';
                           }
                           return null;
                         },
@@ -292,8 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String? Function(String?) _required(String message) {
-    return (value) =>
-        (value ?? '').trim().isEmpty ? message : null;
+    return (value) => (value ?? '').trim().isEmpty ? message : null;
   }
 
   Widget _field(

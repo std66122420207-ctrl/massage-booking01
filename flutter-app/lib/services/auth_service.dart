@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
 import 'api_client.dart';
+import '../utils/thai_mobile_phone.dart';
 
 class AuthService extends ChangeNotifier {
   UserModel? _user;
@@ -16,7 +17,7 @@ class AuthService extends ChangeNotifier {
   String? get error => _error;
 
   Future<void> checkAuthState() async {
-    final current = fb.FirebaseAuth.instance.currentUser;
+    var current = fb.FirebaseAuth.instance.currentUser;
     if (current == null) {
       _user = null;
       return;
@@ -24,6 +25,17 @@ class AuthService extends ChangeNotifier {
 
     _setLoading(true);
     try {
+      await current.reload();
+      current = fb.FirebaseAuth.instance.currentUser;
+      if (current == null) {
+        _user = null;
+        return;
+      }
+      if (_requiresEmailVerification(current) && !current.emailVerified) {
+        await fb.FirebaseAuth.instance.signOut();
+        _user = null;
+        return;
+      }
       _user = await _loadOrCreateProfile(current);
     } finally {
       _setLoading(false);
@@ -37,47 +49,53 @@ class AuthService extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
+    if (!isValidThaiMobilePhone(phone)) {
+      throw Exception(
+          'กรุณากรอกเบอร์มือถือ 10 หลัก โดยขึ้นต้นด้วย 06, 08 หรือ 09');
+    }
     _setLoading(true);
     try {
-      final credential = await fb.FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      final credential =
+          await fb.FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
       final user = credential.user;
       if (user == null) throw Exception('สร้างบัญชีไม่สำเร็จ');
 
-      final profile = <String, dynamic>{
-        'uid': user.uid,
-        'name': name.trim(),
-        'citizenId': citizenId.trim(),
-        'phone': phone.trim(),
-        'email': email.trim(),
-        'role': 'user',
-        'loginMethod': 'email',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
       try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set(profile);
+        await ApiClient.post('/auth/register', {
+          'name': name.trim(),
+          'citizenId': citizenId.trim(),
+          'phone': normalizeThaiMobilePhone(phone),
+        });
       } catch (error) {
         try {
           await user.delete();
         } catch (deleteError) {
           await fb.FirebaseAuth.instance.signOut();
           throw Exception(
-            'บันทึกข้อมูลผู้ใช้ไม่สำเร็จ และยกเลิกบัญชีที่สร้างไว้ไม่ได้ '
+            'สมัครไม่สำเร็จ และยกเลิกบัญชีที่สร้างไว้ไม่ได้ '
             'กรุณาติดต่อผู้ดูแลระบบ ($deleteError)',
           );
         }
-        throw Exception('บันทึกข้อมูลผู้ใช้ลง Firestore ไม่สำเร็จ ($error)');
+        rethrow;
       }
 
-      _user = UserModel.fromMap(profile..remove('createdAt')..remove('updatedAt'));
+      try {
+        await user.sendEmailVerification();
+      } on fb.FirebaseAuthException catch (e) {
+        await fb.FirebaseAuth.instance.signOut();
+        _user = null;
+        throw Exception(
+          'สร้างบัญชีแล้ว แต่ส่งลิงก์ยืนยันอีเมลไม่สำเร็จ '
+          'กรุณาลองเข้าสู่ระบบอีกครั้งเพื่อส่งลิงก์ใหม่ '
+          '(${_mapAuthError(e)})',
+        );
+      }
+
+      await fb.FirebaseAuth.instance.signOut();
+      _user = null;
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e));
     } finally {
@@ -96,8 +114,23 @@ class AuthService extends ChangeNotifier {
         email: email.trim(),
         password: password,
       );
-      final user = credential.user;
+      var user = credential.user;
       if (user == null) throw Exception('เข้าสู่ระบบไม่สำเร็จ');
+
+      await user.reload();
+      user = fb.FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('เข้าสู่ระบบไม่สำเร็จ');
+      if (_requiresEmailVerification(user) && !user.emailVerified) {
+        var resendMessage = 'ส่งลิงก์ยืนยันใหม่ไปยังอีเมลแล้ว';
+        try {
+          await user.sendEmailVerification();
+        } on fb.FirebaseAuthException catch (e) {
+          resendMessage = 'ส่งลิงก์ใหม่ไม่สำเร็จ (${_mapAuthError(e)})';
+        }
+        await fb.FirebaseAuth.instance.signOut();
+        _user = null;
+        throw Exception('กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ $resendMessage');
+      }
       _user = await _loadOrCreateProfile(user);
     } on fb.FirebaseAuthException catch (e) {
       throw Exception(_mapAuthError(e));
@@ -125,23 +158,20 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> updatePhone(String phone) async {
-    await ApiClient.patch('/auth/me', {'phone': phone});
-    final current = fb.FirebaseAuth.instance.currentUser;
-    if (current != null) {
-      await FirebaseFirestore.instance.collection('users').doc(current.uid).set(
-        {'phone': phone, 'updatedAt': FieldValue.serverTimestamp()},
-        SetOptions(merge: true),
-      );
+    if (!isValidThaiMobilePhone(phone)) {
+      throw Exception(
+          'กรุณากรอกเบอร์มือถือ 10 หลัก โดยขึ้นต้นด้วย 06, 08 หรือ 09');
     }
+    final normalizedPhone = normalizeThaiMobilePhone(phone);
+    await ApiClient.patch('/auth/me', {'phone': normalizedPhone});
     if (_user != null) {
-      _user = _user!.copyWith(phone: phone, needsPhone: false);
+      _user = _user!.copyWith(phone: normalizedPhone, needsPhone: false);
       notifyListeners();
     }
   }
 
   Future<UserModel> _loadOrCreateProfile(fb.User user) async {
-    final docRef =
-        FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
     final snapshot = await docRef.get();
 
     if (!snapshot.exists) {
@@ -197,5 +227,10 @@ class AuthService extends ChangeNotifier {
       default:
         return e.message ?? 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
     }
+  }
+
+  bool _requiresEmailVerification(fb.User user) {
+    return user.providerData
+        .any((provider) => provider.providerId == 'password');
   }
 }
