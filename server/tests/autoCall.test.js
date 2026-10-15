@@ -135,7 +135,9 @@ assert.strictEqual(hasActiveBookingForUser([
 	{ userId: 'user-2', status: 'confirmed' },
 ], 'user-1'), false);
 assert.strictEqual(isBookingCancellable('pending'), true);
+assert.strictEqual(isBookingCancellable('confirmed'), true);
 assert.strictEqual(isBookingCancellable('auto_called'), true);
+assert.strictEqual(isBookingCancellable('cancelled'), false);
 assert.strictEqual(isBookingCancellable('in_service'), false);
 assert.strictEqual(isBookingCancellable('done'), false);
 assert.strictEqual(dateStringToUtc('2026-10-09'), Date.parse('2026-10-09T00:00:00.000Z'));

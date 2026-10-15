@@ -180,6 +180,7 @@ class BookingService extends ChangeNotifier {
           message: old.message,
           type: old.type,
           resolvedAction: old.resolvedAction,
+          resolvedByAdmin: old.resolvedByAdmin,
           confirmed: true,
           createdAt: old.createdAt,
         );

@@ -483,10 +483,12 @@ async function markDone(id) {
 
 async function cancelBooking(id) {
   try {
-    await API.cancelBooking(id);
+    const result = await API.cancelBooking(id);
     await loadBookings();
     await loadUpcomingBookings();
-    showToast('ยกเลิกการจองแล้ว');
+    showToast(result.notificationSent === false
+      ? 'ยกเลิกการจองแล้ว แต่ส่งแจ้งเตือนในแอปไม่สำเร็จ'
+      : 'ยกเลิกการจองแล้ว');
   } catch (err) { showToast(`ยกเลิกไม่สำเร็จ: ${err.message}`); }
 }
 
@@ -685,8 +687,10 @@ async function confirmNotificationByAdmin(id) {
 async function cancelNotificationBooking(id) {
   if (!confirm('ยืนยันการยกเลิกคิวนี้หรือไม่?')) return;
   try {
-    await API.cancelNotificationBooking(id);
-    showToast('ยกเลิกคิวแล้ว');
+    const result = await API.cancelNotificationBooking(id);
+    showToast(result.notificationSent === false
+      ? 'ยกเลิกคิวแล้ว แต่สร้างการแจ้งเตือนในแอปไม่สำเร็จ'
+      : 'ยกเลิกคิวแล้ว');
     await Promise.all([loadNotifications(), loadBookings()]);
   } catch (err) {
     showToast(`ยกเลิกคิวไม่สำเร็จ: ${err.message}`);

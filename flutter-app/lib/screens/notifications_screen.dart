@@ -127,10 +127,18 @@ class _NotificationCard extends StatelessWidget {
                 Text(time,
                     style:
                         TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                if (notification.resolvedAction == 'cancelled') ...[
+                if (notification.type == 'booking_cancelled') ...[
                   const SizedBox(height: 10),
                   Text(
-                    'คิวนี้ถูกยกเลิกอัตโนมัติ เนื่องจากไม่ยืนยันการมาถึงภายใน 5 นาที',
+                    'ผู้ดูแลยกเลิกคิวนี้แล้ว',
+                    style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                  ),
+                ] else if (notification.resolvedAction == 'cancelled') ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    notification.resolvedByAdmin
+                        ? 'ผู้ดูแลยกเลิกคิวนี้แล้ว'
+                        : 'คิวนี้ถูกยกเลิกอัตโนมัติ เนื่องจากไม่ยืนยันการมาถึงภายใน 5 นาที',
                     style: TextStyle(fontSize: 12, color: Colors.red.shade700),
                   ),
                 ] else if (!notification.confirmed) ...[

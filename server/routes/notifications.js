@@ -5,6 +5,7 @@ const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { sendPushToUser } = require('./fcm');
 const { sendSms } = require('../services/sms');
 const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue, deleteCachedValue } = require('../services/firestoreGuard');
+const { isBookingCancellable } = require('../services/bookingPolicy');
 
 // ── GET /api/notifications — แจ้งเตือนของผู้ใช้ที่ login อยู่ ──────
 router.get('/', verifyToken, async (req, res) => {
@@ -160,20 +161,49 @@ router.post('/:id/admin-confirm', verifyToken, requireAdmin, async (req, res) =>
 router.post('/:id/admin-cancel', verifyToken, requireAdmin, async (req, res) => {
   try {
     const notificationRef = db.collection(COLLECTIONS.NOTIFICATIONS).doc(req.params.id);
-    const notificationDoc = await notificationRef.get();
-    if (!notificationDoc.exists) return res.status(404).json({ error: 'ไม่พบการแจ้งเตือนนี้' });
-    const notification = notificationDoc.data();
-    await notificationRef.update({
-      confirmed: true,
-      resolvedByAdmin: true,
-      resolvedAction: 'cancelled',
-      resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    if (notification.bookingId) {
-      await db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId).update({
+    const result = await db.runTransaction(async (transaction) => {
+      const notificationDoc = await transaction.get(notificationRef);
+      if (!notificationDoc.exists) return { status: 404, error: 'ไม่พบการแจ้งเตือนนี้' };
+      const notification = notificationDoc.data();
+      if (!notification.bookingId) {
+        return { status: 400, error: 'การแจ้งเตือนนี้ไม่มีรายการจองที่เชื่อมโยง' };
+      }
+
+      const bookingRef = db.collection(COLLECTIONS.BOOKINGS).doc(notification.bookingId);
+      const bookingDoc = await transaction.get(bookingRef);
+      if (!bookingDoc.exists) return { status: 404, error: 'ไม่พบรายการจองที่เชื่อมโยง' };
+      const booking = bookingDoc.data();
+      if (!booking.userId || booking.userId !== notification.userId) {
+        return { status: 409, error: 'ข้อมูลผู้รับการแจ้งเตือนไม่ตรงกับรายการจอง' };
+      }
+      if (!isBookingCancellable(booking.status)) {
+        return { status: 409, error: 'ยกเลิกไม่ได้ เนื่องจากคิวเริ่มให้บริการหรือเสร็จสิ้นแล้ว' };
+      }
+
+      transaction.update(notificationRef, {
+        confirmed: true,
+        resolvedByAdmin: true,
+        resolvedAction: 'cancelled',
+        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      transaction.update(bookingRef, {
         status: 'cancelled',
         cancelledByAdmin: true,
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { status: 200, bookingId: notification.bookingId, booking };
+    });
+    if (result.status !== 200) return res.status(result.status).json({ error: result.error });
+
+    const delivery = await notifyBookingCancelled(result.bookingId, result.booking);
+    deleteCachedValue(`notifications:${result.booking.userId}`);
+    deleteCachedValue('notifications:admin');
+    if (!delivery.inAppSent) {
+      return res.json({
+        success: true,
+        message: 'ยกเลิกคิวแล้ว แต่สร้างการแจ้งเตือนในแอปไม่สำเร็จ',
+        notificationSent: false,
       });
     }
     res.json({ success: true, message: 'ยกเลิกคิวแล้ว' });
@@ -261,5 +291,31 @@ async function createNotification({ userId, bookingId, message, type = 'general'
   deleteCachedValue('notifications:admin');
 }
 
+async function notifyBookingCancelled(bookingId, booking) {
+  const message = `ผู้ดูแลยกเลิกคิว ${booking.queueNumber || ''} วันที่ ${booking.bookingDate || ''} เวลา ${booking.timeSlot || ''} น.`;
+  const deliveries = await Promise.allSettled([
+    createNotification({
+      userId: booking.userId,
+      bookingId,
+      message,
+      type: 'booking_cancelled',
+    }),
+    sendPushToUser(booking.userId, 'คิวของคุณถูกยกเลิก', message, {
+      bookingId,
+      queueNumber: String(booking.queueNumber || ''),
+      type: 'booking_cancelled',
+    }),
+  ]);
+
+  if (deliveries[0].status === 'rejected') {
+    console.error('สร้างการแจ้งเตือนยกเลิกคิวไม่สำเร็จ:', deliveries[0].reason);
+  }
+  if (deliveries[1].status === 'rejected') {
+    console.error('ส่ง push แจ้งยกเลิกคิวไม่สำเร็จ:', deliveries[1].reason);
+  }
+  return { inAppSent: deliveries[0].status === 'fulfilled' };
+}
+
 module.exports = router;
 module.exports.createNotification = createNotification;
+module.exports.notifyBookingCancelled = notifyBookingCancelled;

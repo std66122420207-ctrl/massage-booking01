@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { createBookingTransaction } = require('../services/bookingTransaction');
+const { notifyBookingCancelled } = require('./notifications');
 const {
   isBookingCancellable,
   getBangkokDate,
@@ -157,12 +158,13 @@ router.post('/', verifyToken, async (req, res) => {
 // ── DELETE /api/bookings/:id — ยกเลิกการจอง ────────────────
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
+    const isAdmin = Boolean(req.user.admin ?? req.user.claims?.admin ?? false);
     const ref = db.collection(COLLECTIONS.BOOKINGS).doc(req.params.id);
     const result = await db.runTransaction(async (transaction) => {
       const doc = await transaction.get(ref);
       if (!doc.exists) return { status: 404, error: 'ไม่พบการจอง' };
       const booking = doc.data();
-      if (booking.userId !== req.user.uid && !req.user.admin) {
+      if (booking.userId !== req.user.uid && !isAdmin) {
         return { status: 403, error: 'ไม่มีสิทธิ์ยกเลิกการจองนี้' };
       }
       if (!isBookingCancellable(booking.status)) {
@@ -173,11 +175,21 @@ router.delete('/:id', verifyToken, async (req, res) => {
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      return { status: 200 };
+      return { status: 200, booking };
     });
 
     if (result.status !== 200) {
       return res.status(result.status).json({ error: result.error });
+    }
+    if (isAdmin) {
+      const notification = await notifyBookingCancelled(req.params.id, result.booking);
+      if (!notification.inAppSent) {
+        return res.json({
+          success: true,
+          message: 'ยกเลิกการจองแล้ว แต่สร้างการแจ้งเตือนในแอปไม่สำเร็จ',
+          notificationSent: false,
+        });
+      }
     }
     res.json({ success: true, message: 'ยกเลิกการจองสำเร็จ' });
   } catch (err) {

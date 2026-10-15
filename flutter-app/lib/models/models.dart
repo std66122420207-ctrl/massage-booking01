@@ -224,6 +224,7 @@ class NotificationModel {
   final String message;
   final String type;
   final String? resolvedAction;
+  final bool resolvedByAdmin;
   final bool confirmed;
   final DateTime? createdAt;
 
@@ -232,6 +233,7 @@ class NotificationModel {
     required this.message,
     this.type = 'general',
     this.resolvedAction,
+    this.resolvedByAdmin = false,
     required this.confirmed,
     this.createdAt,
   });
@@ -242,6 +244,7 @@ class NotificationModel {
       message: m['message'] ?? '',
       type: m['type'] ?? 'general',
       resolvedAction: m['resolvedAction'],
+      resolvedByAdmin: m['resolvedByAdmin'] ?? false,
       confirmed: m['confirmed'] ?? false,
       createdAt: _parseFirestoreTimestamp(m['createdAt']),
     );
