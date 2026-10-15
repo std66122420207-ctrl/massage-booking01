@@ -59,7 +59,9 @@ app.use('/api', (req, res, next) => {
 
 // รองรับหลาย origin คั่นด้วย comma ใน FRONTEND_URL เช่น
 // "https://admin.example.com,https://app.example.com"
+const normalizeOrigin = (origin) => origin.trim().replace(/\/+$/, '');
 const defaultOrigins = [
+  process.env.RENDER_EXTERNAL_URL,
   'http://localhost:8080',
   'http://localhost:8081',
   'http://localhost:4000',
@@ -72,20 +74,18 @@ const defaultOrigins = [
   'https://massage-booking-ce032.firebaseapp.com',
   'https://massage-booking-customer.web.app',
   'https://massage-booking-customer.firebaseapp.com',
-];
-const allowedOrigins = (process.env.FRONTEND_URL || defaultOrigins.join(','))
+].filter(Boolean).map(normalizeOrigin);
+const configuredOrigins = (process.env.FRONTEND_URL || '')
   .split(',')
-  .map((s) => s.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
+const allowedOrigins = [...new Set([...defaultOrigins, ...configuredOrigins])];
 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    const normalized = origin.replace(/\/?$/, '');
-    if (defaultOrigins.includes(normalized)) {
+    const normalized = normalizeOrigin(origin);
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(normalized)) {
       return callback(null, true);
     }
     if (!isProd && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) {
