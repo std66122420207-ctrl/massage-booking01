@@ -750,12 +750,14 @@ async function init() {
   await renderReport();
   await loadSettings();
 
-  // Auto-refresh ทุก 15 วินาที
-  setInterval(loadBookings, 15000);
-  setInterval(loadNotifications, 15000);
+
+  // --- Auto-refresh ทุก 60 วินาที
+  setInterval(loadBookings, 60000);
+  setInterval(loadNotifications, 60000);
   setInterval(() => {
     if (document.getElementById('page-queue').classList.contains('active')) {
       loadUpcomingBookings();
     }
   }, 60000);
+
 }
