@@ -326,6 +326,22 @@ async function loadBookings() {
   ]);
   if (todayResult.status === 'fulfilled' && queueResult.status === 'fulfilled') {
     bookings = todayResult.value;
+    
+    // === แทรกโค้ดจัดเรียงข้อมูลคิวและเวลาตรงนี้ ===
+    if (Array.isArray(bookings)) {
+      bookings.sort((a, b) => {
+        // 1. เรียงตามเวลาจองก่อน (09:00 -> 13:00 -> 14:30)
+        const timeCompare = (a.time || '').localeCompare(b.time || '');
+        if (timeCompare !== 0) return timeCompare;
+
+        // 2. ถ้าเวลาเท่ากัน ให้เรียงตามเลขคิว (A001 มาก่อน A004)
+        const queueA = String(a.queueNumber || a.queueNo || a.id || '');
+        const queueB = String(b.queueNumber || b.queueNo || b.id || '');
+        return queueA.localeCompare(queueB, undefined, { numeric: true });
+      });
+    }
+    // ============================================
+
     queueStatus = queueResult.value || { currentQueue: null };
   } else {
     const err = todayResult.status === 'rejected' ? todayResult.reason : queueResult.reason;
