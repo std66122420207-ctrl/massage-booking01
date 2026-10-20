@@ -3,7 +3,7 @@
     "short_name": "ท่าวังหิน",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#F0F5F2",
+    "background_color": "#FFFFFF",
     "theme_color": "#2E7D52",
     "description": "ระบบจองคิวนวดแผนไทยและคลินิกแพทย์แผนไทย ท่าวังหิน",
     "orientation": "portrait-primary",
