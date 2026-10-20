@@ -300,6 +300,7 @@ tbody tr:hover td { background: var(--jade-pale); }
 .staff-name { font-family: 'Noto Serif Thai', serif; font-size: 16px; color: var(--forest); font-weight: 600; margin-bottom: 3px; }
 .staff-exp { font-size: 12px; color: var(--slate); margin-bottom: 12px; }
 .staff-card .staff-name, .staff-card .staff-exp, .staff-card > .badge { display: block; text-align: center; }
+.staff-queue-order { margin: 0 auto 8px; color: var(--jade); font-size: 13px; font-weight: 700; text-align: center; }
 .staff-count { margin-top: 14px; padding: 12px 0; border-top: 1px solid var(--border); font-size: 13px; color: var(--slate); }
 .staff-count strong { color: var(--jade); font-weight: 700; }
 .staff-photo-img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin: 0 auto 14px; display: block; box-shadow: 0 4px 12px rgba(46,125,82,0.25); }
@@ -762,6 +763,11 @@ tbody tr:hover td { background: var(--jade-pale); }
     <div class="form-group">
       <label>ชื่อ</label>
       <input type="text" id="staff-modal-name" required>
+    </div>
+    <div class="form-group" id="staff-modal-queue-order-group" style="display:none">
+      <label for="staff-modal-queue-order">เลขหมอ (1–9)</label>
+      <input type="number" id="staff-modal-queue-order" min="1" max="9" step="1" inputmode="numeric">
+      <small id="staff-modal-queue-order-help">กำหนดเลขหมอสำหรับสร้างรหัสคิว เลขที่บันทึกแล้วจะเปลี่ยนไม่ได้</small>
     </div>
     <div class="form-group">
       <label for="staff-modal-phone">เบอร์ติดต่อหมอนวด</label>

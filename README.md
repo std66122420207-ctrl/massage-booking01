@@ -51,8 +51,9 @@ npm run test:booking-concurrency
    Deploy Firestore rules/indexes แยกได้ด้วย
    `firebase deploy --only firestore:rules,firestore:indexes --project massage-booking-ce032`.
 
-ก่อนเปิดรับการจองด้วยเลขคิวรูปแบบใหม่ ให้ตรวจลำดับหมอนวดด้วยคำสั่ง dry run
-จากโฟลเดอร์ `server`:
+ก่อนเปิดรับการจองด้วยเลขคิวรูปแบบใหม่ ให้กำหนดเลขหมอ 1–9 ให้หมอนวดเดิมจาก
+หน้า Admin > ทีมหมอนวด > แก้ไข โดยเลขที่บันทึกแล้วจะเปลี่ยนไม่ได้เพื่อรักษารหัสคิว
+หากต้องการตรวจสอบหรือกำหนดผ่านสคริปต์ ให้ใช้ dry run จากโฟลเดอร์ `server`:
 
 ```bash
 node scripts/migrateStaffQueueOrder.js

@@ -226,6 +226,9 @@ function renderStaffGrid() {
         ? `<img class="staff-photo-img" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(s.name)}">`
         : `<div class="staff-avatar"><i class="fa-solid fa-user"></i></div>`}
       <div class="staff-name">${escapeHtml(s.name)}</div>
+      <div class="staff-queue-order">${Number.isInteger(Number(s.queueOrder)) && Number(s.queueOrder) >= 1 && Number(s.queueOrder) <= 9
+        ? `เลขหมอ ${String(Number(s.queueOrder)).padStart(2, '0')}`
+        : 'ยังไม่กำหนดเลขหมอ'}</div>
       <div class="staff-exp">ประสบการณ์ ${escapeHtml(s.experience || '-')}</div>
       <span class="badge ${statusBadge[s.status] || 'badge-gray'}">${escapeHtml(statusLabel[s.status] || s.status)}</span>
       <div class="staff-count">วันนี้: <strong>${escapeHtml(s.todayCount || 0)} คิว</strong></div>
@@ -288,6 +291,18 @@ function openStaffModal(staff) {
   document.getElementById('staff-modal-phone').value      = staff?.phone || '';
   document.getElementById('staff-modal-experience').value = staff?.experience || '';
   document.getElementById('staff-modal-photo').value      = staff?.photo || '';
+  const queueOrderGroup = document.getElementById('staff-modal-queue-order-group');
+  const queueOrderInput = document.getElementById('staff-modal-queue-order');
+  const queueOrderHelp = document.getElementById('staff-modal-queue-order-help');
+  const hasQueueOrder = Number.isInteger(Number(staff?.queueOrder))
+    && Number(staff.queueOrder) >= 1 && Number(staff.queueOrder) <= 9;
+  queueOrderGroup.style.display = staff ? 'flex' : 'none';
+  queueOrderInput.value = hasQueueOrder ? String(staff.queueOrder) : '';
+  queueOrderInput.required = Boolean(staff) && !hasQueueOrder;
+  queueOrderInput.readOnly = hasQueueOrder;
+  queueOrderHelp.textContent = hasQueueOrder
+    ? 'เลขหมอที่บันทึกแล้วจะเปลี่ยนไม่ได้ เพื่อป้องกันรหัสคิวเปลี่ยน'
+    : 'กำหนดเลขหมอ 1–9 ที่ยังไม่ซ้ำกับหมอนวดคนอื่น';
   staffModalOverlay.style.display = 'flex';
 }
 
@@ -329,6 +344,10 @@ staffModalForm.addEventListener('submit', async (e) => {
       experience: document.getElementById('staff-modal-experience').value.trim(),
       photo:      staffPhotoInput.value.trim(),
     };
+    if (id) {
+      const queueOrderInput = document.getElementById('staff-modal-queue-order');
+      if (queueOrderInput.value) data.queueOrder = Number(queueOrderInput.value);
+    }
 
     const res = id ? await API.updateStaff(id, data) : await API.createStaff(data);
     if (res.error) throw new Error(res.error);
