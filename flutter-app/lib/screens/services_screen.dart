@@ -426,8 +426,7 @@ class _BookingSheetState extends State<BookingSheet> {
     final existingBookings = context
         .read<BookingService>()
         .bookings
-        .where((item) =>
-            item.bookingDate == bookingDate && item.status != 'cancelled')
+        .where((item) => item.bookingDate == bookingDate && item.isActive)
         .toList();
     if (existingBookings.isNotEmpty) {
       final existingBooking = existingBookings.first;

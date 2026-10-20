@@ -17,7 +17,7 @@
     {
       "target": "customer",
       "public": "flutter-app/build/web",
-      "predeploy": ["npm run build:flutter:deploy"],
+      "predeploy": ["node scripts/build_flutter_web.js"],
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
     }
   ]

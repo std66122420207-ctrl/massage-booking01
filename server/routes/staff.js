@@ -82,23 +82,49 @@ router.post('/', verifyToken, requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'รูปแบบเบอร์ติดต่อไม่ถูกต้อง' });
   }
   try {
-    const doc = await db.collection(COLLECTIONS.STAFF).add({
-      name,
-      phone: phone?.trim() || null,
-      experience: experience || '',
-      photo: photo || null,
-      status: 'available',
-      active: true,
-      todayCount: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    const staffRef = db.collection(COLLECTIONS.STAFF).doc();
+    const orderCounterRef = db.collection('counters').doc('staff-queue-order');
+    const queueOrder = await db.runTransaction(async (transaction) => {
+      const [staffSnap, counterDoc] = await Promise.all([
+        transaction.get(db.collection(COLLECTIONS.STAFF)),
+        transaction.get(orderCounterRef),
+      ]);
+      const currentMax = staffSnap.docs.reduce(
+        (max, doc) => Math.max(max, Number(doc.data().queueOrder) || 0),
+        0
+      );
+      const counter = counterDoc.exists ? Number(counterDoc.data().count) || 0 : 0;
+      const nextOrder = Math.max(currentMax, counter) + 1;
+      if (nextOrder > 9) {
+        throw Object.assign(
+          new Error('รองรับรหัสหมอนวดได้สูงสุด 9 คน ต้องปรับรูปแบบเลขคิวก่อนเพิ่มหมอนวด'),
+          { code: 409 }
+        );
+      }
+      transaction.set(orderCounterRef, { count: nextOrder });
+      transaction.set(staffRef, {
+        name,
+        phone: phone?.trim() || null,
+        experience: experience || '',
+        photo: photo || null,
+        queueOrder: nextOrder,
+        status: 'available',
+        active: true,
+        todayCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return nextOrder;
     });
-    res.status(201).json({ success: true, id: doc.id });
+    res.status(201).json({ success: true, id: staffRef.id, queueOrder });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.code === 409 ? 409 : 500).json({ error: err.message });
   }
 });
 
-// PATCH /api/staff/:id — Admin: แก้ไขข้อมูลหมอนวด
+/*
+ * Legacy staff documents must be assigned queueOrder explicitly with
+ * scripts/migrateStaffQueueOrder.js before they can receive coded queues.
+ */
 router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
   const { name, phone, experience, active, photo } = req.body;
   if (Object.hasOwn(req.body, 'email')) {

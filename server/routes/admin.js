@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { db, COLLECTIONS } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
-const { getBangkokDate } = require('../services/bookingPolicy');
+const { getBangkokDate, parseTimeToMinutes } = require('../services/bookingPolicy');
 const { isQuotaExceededError, markQuotaExceeded, isQuotaPaused, getCachedValue, setCachedValue } = require('../services/firestoreGuard');
 
 function getReportDates(now = new Date()) {
@@ -20,11 +20,8 @@ function isBookingCounted(booking) {
 function summarizeBookingCounts(bookings = []) {
   const total = bookings.filter(isBookingCounted).length;
   const done = bookings.filter((booking) => isBookingCounted(booking) && booking.status === 'done').length;
-  const revenue = bookings
-    .filter((booking) => isBookingCounted(booking) && booking.status === 'done')
-    .reduce((sum, booking) => sum + (Number(booking.servicePrice) || 0), 0);
 
-  return { total, done, cancelled: 0, revenue };
+  return { total, done, cancelled: 0, revenue: null };
 }
 
 // ทุก route ในไฟล์นี้ใช้ได้เฉพาะแอดมิน
@@ -51,7 +48,7 @@ router.get('/report', async (req, res) => {
     const snap = await db.collection(COLLECTIONS.BOOKINGS)
       .where('bookingDate', '>=', from).where('bookingDate', '<=', to).get();
     const byDate = Object.fromEntries(dates.map((date) => [
-      date, { total: 0, done: 0, cancelled: 0, revenue: 0 },
+      date, { total: 0, done: 0, cancelled: 0, revenue: null },
     ]));
     snap.docs.forEach((doc) => {
       const booking = doc.data();
@@ -64,7 +61,6 @@ router.get('/report', async (req, res) => {
       row.total += 1;
       if (booking.status === 'done') {
         row.done += 1;
-        row.revenue += Number(booking.servicePrice) || 0;
       }
     });
     const response = Object.entries(byDate).map(([date, values]) => ({ date, ...values }));
@@ -119,6 +115,15 @@ router.put('/settings', async (req, res) => {
   const allowed = ['name', 'open', 'close', 'advance', 'maxqueue'];
   const settings = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
   try {
+    const currentDoc = await db.collection('settings').doc('general').get();
+    const current = currentDoc.exists ? currentDoc.data() : {};
+    const openTime = settings.open ?? current.open ?? '08:30';
+    const closeTime = settings.close ?? current.close ?? '17:00';
+    const openingMinutes = parseTimeToMinutes(openTime);
+    const closingMinutes = parseTimeToMinutes(closeTime);
+    if (openingMinutes === null || closingMinutes === null || openingMinutes >= closingMinutes) {
+      return res.status(400).json({ error: 'เวลาเปิดและปิดทำการไม่ถูกต้อง' });
+    }
     await db.collection('settings').doc('general').set(settings, { merge: true });
     res.json({ success: true, settings });
   } catch (err) { res.status(500).json({ error: err.message }); }

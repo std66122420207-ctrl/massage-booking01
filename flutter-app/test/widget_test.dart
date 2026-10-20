@@ -20,7 +20,7 @@ void main() {
       staffName: 'พี่สมใจ',
       bookingDate: '2026-10-10',
       timeSlot: '10:00',
-      queueNumber: 'A001',
+      queueNumber: 'A101',
       status: 'confirmed',
       healthcareRight: 'universal',
       nationalId: '1234567890123',
@@ -37,5 +37,26 @@ void main() {
     expect(cancelled.healthcareRight, booking.healthcareRight);
     expect(cancelled.nationalId, booking.nationalId);
     expect(cancelled.createdAt, booking.createdAt);
+  });
+
+  test('only unfinished booking statuses count as active', () {
+    const booking = BookingModel(
+      id: 'booking-2',
+      userId: 'user-1',
+      serviceId: 'service-1',
+      serviceName: 'นวดเท้า',
+      servicePrice: 200,
+      bookingDate: '2026-10-10',
+      timeSlot: '10:00',
+      queueNumber: 'A101',
+      status: 'done',
+    );
+
+    expect(booking.isActive, isFalse);
+    expect(booking.copyWith(status: 'cancelled').isActive, isFalse);
+    expect(booking.copyWith(status: 'pending').isActive, isTrue);
+    expect(booking.copyWith(status: 'confirmed').isActive, isTrue);
+    expect(booking.copyWith(status: 'auto_called').isActive, isTrue);
+    expect(booking.copyWith(status: 'in_service').isActive, isTrue);
   });
 }

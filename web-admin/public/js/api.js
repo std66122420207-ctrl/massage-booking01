@@ -79,6 +79,23 @@ const API = {
       headers: await this._headers(),
     });
   },
+  async getBookingHistory(cursor) {
+    const query = new URLSearchParams({ limit: '50' });
+    if (cursor) query.set('cursor', cursor);
+    return this._request(`/bookings/admin/history?${query}`, {
+      headers: await this._headers(),
+    });
+  },
+  async getBookingDetails(id) {
+    return this._request(`/bookings/admin/${encodeURIComponent(id)}/details`, {
+      headers: await this._headers(),
+    });
+  },
+  async getBookingNationalId(id) {
+    return this._request(`/bookings/admin/${encodeURIComponent(id)}/national-id`, {
+      headers: await this._headers(),
+    });
+  },
   async getQueueStatus() {
     return this._request('/queue/status');
   },

@@ -87,7 +87,7 @@ class BookingModel {
   final String? staffName;
   final String bookingDate; // yyyy-MM-dd
   final String timeSlot; // HH:mm
-  final String queueNumber; // A001
+  final String queueNumber; // New queues: service code + staff order + daily number (e.g. A101)
   final String status; // pending|confirmed|in_service|done|cancelled
   final String healthcareRight;
   final String? nationalId;
@@ -143,6 +143,9 @@ class BookingModel {
     };
     return map[status] ?? status;
   }
+
+  bool get isActive =>
+      const {'pending', 'confirmed', 'auto_called', 'in_service'}.contains(status);
 
   BookingModel copyWith({String? status}) => BookingModel(
         id: id,

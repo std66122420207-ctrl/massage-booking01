@@ -493,7 +493,7 @@ tbody tr:hover td { background: var(--jade-pale); }
         </div>
         <div class="stat-card">
           <div class="stat-icon" style="background:#EBF5FB"><i class="fa-solid fa-sack-dollar" style="color:#2E86DE"></i></div>
-          <div class="stat-info"><p>รายได้วันนี้</p><h3 id="stat-revenue">-</h3><small>บาท</small></div>
+          <div class="stat-info"><p>รายรับวันนี้</p><h3 id="stat-revenue">-</h3><small>ไม่มีข้อมูลการชำระเงิน</small></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon" style="background:#F4EBFB"><i class="fa-solid fa-user-group" style="color:#8E44AD"></i></div>
@@ -594,7 +594,7 @@ tbody tr:hover td { background: var(--jade-pale); }
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>คิว</th><th>เวลา</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+            <thead><tr><th>คิว</th><th>เวลารับบริการ</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
             <tbody id="bookings-tbody"></tbody>
           </table>
         </div>
@@ -636,10 +636,28 @@ tbody tr:hover td { background: var(--jade-pale); }
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>คิว</th><th>เวลาจอง</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+              <thead><tr><th>คิว</th><th>เวลารับบริการ</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>สิทธิ</th><th>ช่องทาง</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
               <tbody id="queue-tbody"></tbody>
             </table>
           </div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header">
+            <h4>ประวัติคิวที่เสร็จสิ้นหรือยกเลิก</h4>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn-secondary" id="queue-history-refresh" aria-label="โหลดประวัติคิวใหม่"><i class="fa-solid fa-rotate"></i> โหลดใหม่</button>
+              <button type="button" class="btn-secondary" id="queue-history-prev" disabled>ก่อนหน้า</button>
+              <span class="badge badge-gray" id="queue-history-count">หน้า 1</span>
+              <button type="button" class="btn-secondary" id="queue-history-next" disabled>ถัดไป</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>วันที่</th><th>คิว</th><th>เวลารับบริการ</th><th>ชื่อลูกค้า</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>ข้อมูล</th></tr></thead>
+              <tbody id="queue-history-tbody"></tbody>
+            </table>
+          </div>
+          <p style="font-size:12px;color:var(--slate);margin-top:10px">ลบรายการที่เสร็จสิ้นหรือยกเลิกแล้วโดยอัตโนมัติเมื่อเกิน 7 วัน</p>
         </div>
         <div class="card" style="grid-column:1/-1">
           <div class="card-header">
@@ -654,7 +672,7 @@ tbody tr:hover td { background: var(--jade-pale); }
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>วันที่</th><th>คิว</th><th>เวลา</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
+              <thead><tr><th>วันที่รับบริการ</th><th>คิว</th><th>เวลารับบริการ</th><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>บริการ</th><th>หมอนวด</th><th>สถานะ</th><th>การดำเนินการ</th></tr></thead>
               <tbody id="upcoming-bookings-tbody"></tbody>
             </table>
           </div>
@@ -694,7 +712,7 @@ tbody tr:hover td { background: var(--jade-pale); }
       <div class="card">
         <div class="card-header"><h4>รายงานสรุปรายสัปดาห์</h4></div>
         <table>
-          <thead><tr><th>วัน</th><th>จองทั้งหมด</th><th>เสร็จสิ้น</th><th>ยกเลิก</th><th>รายได้</th></tr></thead>
+          <thead><tr><th>วัน</th><th>จองทั้งหมด</th><th>เสร็จสิ้น</th><th>ยกเลิก</th><th>รายรับ (ไม่มีข้อมูลชำระเงิน)</th></tr></thead>
           <tbody id="report-tbody"></tbody>
         </table>
       </div>
@@ -719,6 +737,22 @@ tbody tr:hover td { background: var(--jade-pale); }
 </main>
 
 </div><!-- /app-shell -->
+
+<div id="booking-details-modal" class="modal-overlay" style="display:none" aria-hidden="true">
+  <section class="modal-card" style="max-width:520px" role="dialog" aria-modal="true" aria-labelledby="booking-details-title">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <h4 id="booking-details-title">ข้อมูลผู้รับบริการ</h4>
+      <button type="button" class="btn-secondary" id="booking-details-close" aria-label="ปิดหน้าต่าง">ปิด</button>
+    </div>
+    <p id="booking-details-error" role="status" style="color:var(--slate);margin-bottom:12px"></p>
+    <div id="booking-details-content"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <strong>เลขบัตรประชาชน</strong>
+      <span id="booking-details-national-id" style="font-variant-numeric:tabular-nums">-</span>
+    </div>
+    <button type="button" class="btn-secondary" id="booking-details-reveal" style="margin-top:12px;display:none">ดูเลขบัตรประชาชน</button>
+  </section>
+</div>
 
 <!-- ── STAFF ADD/EDIT MODAL ─────────────────────────────────── -->
 <div id="staff-modal-overlay" class="modal-overlay" style="display:none">

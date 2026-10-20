@@ -7,7 +7,7 @@
     "start": "node index.js",
     "start:prod": "NODE_ENV=production node index.js",
     "dev": "nodemon index.js",
-    "test": "node --test tests/thaiMobilePhone.test.js tests/emailAddress.test.js && node scripts/test_api.js",
+    "test": "node --test tests/thaiMobilePhone.test.js tests/emailAddress.test.js tests/bookingPolicy.test.js tests/bookingHistory.test.js tests/bookingRetention.test.js && node scripts/test_api.js",
     "seed": "node scripts/seed.js",
     "set-admin": "node scripts/setAdmin.js"
   },

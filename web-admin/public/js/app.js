@@ -7,8 +7,15 @@ let services = [];
 let staffList = [];
 let bookings = [];
 let upcomingBookings = [];
+let historyBookings = [];
+let historyPageCursors = [null];
+let historyPageIndex = 0;
+let historyNextCursor = null;
+let historyLoading = false;
+let historyRequestId = 0;
 let bookingSearch = '';
 let queueStatus = { currentQueue: null };
+let bookingDetailsState = null;
 const bangkokDate = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Bangkok',
   year: 'numeric',
@@ -34,6 +41,21 @@ const STATUS_BADGE = {
   cancelled:  'badge-red',
 };
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'auto_called'];
+
+function formatBookingDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return '-';
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+function bookingDetailsButton(id) {
+  return `<button type="button" class="action-btn btn-edit" data-booking-action="details" data-booking-id="${escapeHtml(id)}">ดูข้อมูลผู้รับบริการ</button>`;
+}
 
 // ── Auth: login / logout / gate ──────────────────────────────
 const loginScreen = document.getElementById('login-screen');
@@ -112,6 +134,7 @@ function showPage(id) {
   if (id === 'queue') {
     loadBookings();
     loadUpcomingBookings();
+    loadBookingHistory({ reset: true });
   }
 }
 
@@ -340,6 +363,43 @@ async function loadBookings() {
   renderUpcomingBookings();
 }
 
+function renderHistoryPagination() {
+  document.getElementById('queue-history-count').textContent =
+    `หน้า ${historyPageIndex + 1} · ${historyBookings.length} รายการ`;
+  document.getElementById('queue-history-prev').disabled = historyLoading || historyPageIndex === 0;
+  document.getElementById('queue-history-next').disabled = historyLoading || !historyNextCursor;
+  document.getElementById('queue-history-refresh').disabled = historyLoading;
+}
+
+async function loadBookingHistory({ reset = false } = {}) {
+  if (reset) {
+    historyPageCursors = [null];
+    historyPageIndex = 0;
+    historyNextCursor = null;
+  }
+  const requestId = ++historyRequestId;
+  const cursor = historyPageCursors[historyPageIndex];
+  historyLoading = true;
+  renderHistoryPagination();
+
+  try {
+    const page = await API.getBookingHistory(cursor);
+    if (requestId !== historyRequestId) return;
+    historyBookings = Array.isArray(page.items) ? page.items : [];
+    historyNextCursor = page.nextCursor || null;
+    if (historyNextCursor) historyPageCursors[historyPageIndex + 1] = historyNextCursor;
+  } catch (err) {
+    if (requestId !== historyRequestId) return;
+    showToast(`โหลดประวัติการจองไม่สำเร็จ: ${err.message}`);
+  } finally {
+    if (requestId === historyRequestId) {
+      historyLoading = false;
+      renderHistoryPagination();
+      renderQueuePage();
+    }
+  }
+}
+
 async function loadUpcomingBookings() {
   try {
     upcomingBookings = await API.getUpcomingBookings();
@@ -357,15 +417,13 @@ function renderDashboardStats() {
   const inService = bookings.filter(b => b.status === 'in_service').length;
   const done    = bookings.filter(b => b.status === 'done').length;
   const cancelled = bookings.filter(b => b.status === 'cancelled').length;
-  const revenue = bookings.filter(b => b.status === 'done')
-                          .reduce((sum, b) => sum + (b.servicePrice || 0), 0);
   const current = bookings.find(b => b.queueNumber === queueStatus.currentQueue)
     || bookings.find(b => b.status === 'in_service');
 
   document.getElementById('stat-total').textContent   = total;
   document.getElementById('stat-waiting').textContent = waiting;
   document.getElementById('stat-done').textContent    = done;
-  document.getElementById('stat-revenue').textContent = revenue.toLocaleString();
+  document.getElementById('stat-revenue').textContent = 'ไม่มีข้อมูล';
   document.getElementById('stat-current').textContent = queueStatus.currentQueue
     ? `กำลังให้บริการ: ${queueStatus.currentQueue}`
     : current ? `กำลังให้บริการ: ${current.queueNumber}` : 'ไม่มีคิวกำลังให้บริการ';
@@ -433,6 +491,7 @@ function renderBookingsTable() {
       <td>
         ${b.status === 'in_service' ? `<button class="action-btn btn-done" data-booking-action="complete" data-booking-id="${escapeHtml(b.id)}">เสร็จ</button>` : ''}
         ${CANCELLABLE_STATUSES.includes(b.status) ? `<button class="action-btn btn-cancel" data-booking-action="cancel" data-booking-id="${escapeHtml(b.id)}">ยกเลิก</button>` : ''}
+        ${bookingDetailsButton(b.id)}
       </td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">วันนี้ยังไม่มีรายการจอง</td></tr>';
@@ -447,7 +506,7 @@ function renderUpcomingBookings() {
   document.getElementById('upcoming-bookings-count').textContent = `${list.length} รายการ`;
   tbody.innerHTML = list.map(b => `
     <tr>
-      <td>${escapeHtml(b.bookingDate || '-')}</td>
+      <td>${escapeHtml(formatBookingDate(b.bookingDate))}</td>
       <td class="queue-id">${escapeHtml(b.queueNumber || '-')}</td>
       <td>${escapeHtml(b.timeSlot || '-')}</td>
       <td>${escapeHtml(b.customerName || b.userName || '-')}</td>
@@ -456,8 +515,9 @@ function renderUpcomingBookings() {
       <td>${escapeHtml(b.staffName || '-')}</td>
       <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${escapeHtml(STATUS_LABEL[b.status] || b.status)}</span></td>
       <td>${CANCELLABLE_STATUSES.includes(b.status)
-        ? `<button class="action-btn btn-cancel" data-booking-action="cancel" data-booking-id="${escapeHtml(b.id)}">ยกเลิก</button>`
-        : ''}</td>
+        ? `<button class="action-btn btn-cancel" data-booking-action="cancel" data-booking-id="${escapeHtml(b.id)}">ยกเลิก</button>${bookingDetailsButton(b.id)}`
+        : bookingDetailsButton(b.id)}
+      </td>
     </tr>
   `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--slate);padding:24px">ไม่มีรายการจองในวันที่เลือก</td></tr>';
 }
@@ -472,6 +532,17 @@ document.getElementById('queue-date-clear')?.addEventListener('click', () => {
   renderUpcomingBookings();
 });
 document.getElementById('queue-upcoming-refresh')?.addEventListener('click', loadUpcomingBookings);
+document.getElementById('queue-history-refresh')?.addEventListener('click', () => loadBookingHistory({ reset: true }));
+document.getElementById('queue-history-prev')?.addEventListener('click', () => {
+  if (historyLoading || historyPageIndex === 0) return;
+  historyPageIndex -= 1;
+  loadBookingHistory();
+});
+document.getElementById('queue-history-next')?.addEventListener('click', () => {
+  if (historyLoading || !historyNextCursor) return;
+  historyPageIndex += 1;
+  loadBookingHistory();
+});
 
 async function markDone(id) {
   try {
@@ -491,6 +562,126 @@ async function cancelBooking(id) {
       : 'ยกเลิกการจองแล้ว');
   } catch (err) { showToast(`ยกเลิกไม่สำเร็จ: ${err.message}`); }
 }
+
+const bookingDetailsOverlay = document.getElementById('booking-details-modal');
+const bookingDetailsReveal = document.getElementById('booking-details-reveal');
+
+function closeBookingDetails() {
+  bookingDetailsState = null;
+  bookingDetailsOverlay.style.display = 'none';
+  bookingDetailsOverlay.setAttribute('aria-hidden', 'true');
+  document.getElementById('booking-details-error').textContent = '';
+  document.getElementById('booking-details-content').textContent = '';
+  document.getElementById('booking-details-national-id').textContent = '-';
+  bookingDetailsReveal.style.display = 'none';
+  bookingDetailsReveal.disabled = false;
+  bookingDetailsReveal.textContent = 'ดูเลขบัตรประชาชน';
+}
+
+function renderBookingDetails(details) {
+  const paymentLabels = {
+    paid: 'ชำระแล้ว',
+    unpaid: 'ยังไม่ชำระ',
+    pending: 'รอตรวจสอบ',
+    unknown: 'ไม่มีข้อมูลสถานะการชำระเงิน',
+  };
+  const status = STATUS_LABEL[details.bookingStatus] || details.bookingStatus || 'ไม่มีข้อมูล';
+  const payment = paymentLabels[details.paymentStatus]
+    || (details.paymentStatus ? String(details.paymentStatus) : 'ไม่มีข้อมูลสถานะการชำระเงิน');
+  const rows = [
+    ['ชื่อผู้รับบริการ', details.customerName || 'ไม่มีข้อมูล'],
+    ['เบอร์โทรศัพท์', details.customerPhone || 'ไม่มีข้อมูล'],
+    ['บริการ', details.serviceName || 'ไม่มีข้อมูล'],
+    ['หมอนวด', details.staffName || 'ไม่มีข้อมูล'],
+    ['วันที่รับบริการ', formatBookingDate(details.bookingDate)],
+    ['เวลารับบริการ', details.timeSlot || 'ไม่มีข้อมูล'],
+    ['เลขคิว', details.queueNumber || 'ไม่มีข้อมูล'],
+    ['สถานะการจอง', status],
+    ['สถานะการชำระเงิน', payment],
+  ];
+  document.getElementById('booking-details-content').innerHTML = rows.map(([label, value]) => `
+    <div style="display:grid;grid-template-columns: minmax(130px, 1fr) 1.5fr;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <strong>${escapeHtml(label)}</strong><span>${escapeHtml(value)}</span>
+    </div>
+  `).join('');
+
+  const nationalId = document.getElementById('booking-details-national-id');
+  nationalId.textContent = details.hasNationalId
+    ? details.nationalIdMasked || 'ปกปิดข้อมูล'
+    : 'ไม่มีข้อมูลเลขบัตรประชาชน';
+  bookingDetailsReveal.style.display = details.hasNationalId ? '' : 'none';
+}
+
+async function openBookingDetails(id) {
+  const state = { id, nationalId: null, loadingNationalId: false };
+  bookingDetailsState = state;
+  bookingDetailsOverlay.style.display = 'flex';
+  bookingDetailsOverlay.setAttribute('aria-hidden', 'false');
+  document.getElementById('booking-details-error').textContent = 'กำลังโหลดข้อมูล...';
+  document.getElementById('booking-details-content').textContent = '';
+  document.getElementById('booking-details-national-id').textContent = '-';
+  bookingDetailsReveal.style.display = 'none';
+  bookingDetailsReveal.disabled = false;
+  bookingDetailsReveal.textContent = 'ดูเลขบัตรประชาชน';
+
+  try {
+    const details = await API.getBookingDetails(id);
+    if (bookingDetailsState !== state) return;
+    state.details = details;
+    renderBookingDetails(details);
+    document.getElementById('booking-details-error').textContent = '';
+  } catch (err) {
+    if (bookingDetailsState !== state) return;
+    document.getElementById('booking-details-error').textContent = `โหลดข้อมูลไม่สำเร็จ: ${err.message}`;
+  }
+}
+
+document.getElementById('booking-details-close').addEventListener('click', closeBookingDetails);
+bookingDetailsOverlay.addEventListener('click', event => {
+  if (event.target === bookingDetailsOverlay) closeBookingDetails();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && bookingDetailsState) closeBookingDetails();
+});
+bookingDetailsReveal.addEventListener('click', async () => {
+  if (!bookingDetailsState?.details?.hasNationalId || bookingDetailsState.loadingNationalId) return;
+  const state = bookingDetailsState;
+  if (state.nationalId) {
+    state.nationalId = null;
+    document.getElementById('booking-details-national-id').textContent =
+      state.details.nationalIdMasked || 'ปกปิดข้อมูล';
+    bookingDetailsReveal.textContent = 'ดูเลขบัตรประชาชน';
+    return;
+  }
+
+  const { id } = state;
+  state.loadingNationalId = true;
+  bookingDetailsReveal.disabled = true;
+  bookingDetailsReveal.textContent = 'กำลังโหลด...';
+  try {
+    const result = await API.getBookingNationalId(id);
+    if (bookingDetailsState !== state) return;
+    if (!result.nationalId) {
+      state.details.hasNationalId = false;
+      document.getElementById('booking-details-national-id').textContent = 'ไม่มีข้อมูลเลขบัตรประชาชน';
+      bookingDetailsReveal.style.display = 'none';
+      return;
+    }
+    state.nationalId = result.nationalId;
+    document.getElementById('booking-details-national-id').textContent = result.nationalId;
+    bookingDetailsReveal.textContent = 'ซ่อนเลขบัตรประชาชน';
+  } catch (err) {
+    if (bookingDetailsState === state) {
+      document.getElementById('booking-details-error').textContent = `โหลดเลขบัตรประชาชนไม่สำเร็จ: ${err.message}`;
+      bookingDetailsReveal.textContent = 'ลองดูเลขบัตรอีกครั้ง';
+    }
+  } finally {
+    if (bookingDetailsState === state) {
+      state.loadingNationalId = false;
+      bookingDetailsReveal.disabled = false;
+    }
+  }
+});
 
 // ── Booking Form ────────────────────────────────────────────
 document.getElementById('booking-form').addEventListener('submit', async (e) => {
@@ -529,8 +720,17 @@ function renderQueuePage() {
   const current  = bookings.find(b => b.queueNumber === queueStatus.currentQueue)
     || bookings.find(b => b.status === 'in_service');
   const allWaiting = bookings.filter(b => ['pending', 'confirmed', 'auto_called'].includes(b.status))
-    .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
+    .sort((a, b) => (
+      String(a.bookingDate || '').localeCompare(String(b.bookingDate || ''))
+      || String(a.timeSlot || '').localeCompare(String(b.timeSlot || ''))
+    ));
   const done     = bookings.filter(b => b.status === 'done');
+  const todayHistory = bookings.filter(b => ['done', 'cancelled'].includes(b.status));
+  const history = [...historyBookings, ...todayHistory]
+    .sort((a, b) => (
+      String(b.bookingDate || '').localeCompare(String(a.bookingDate || ''))
+      || String(b.timeSlot || '').localeCompare(String(a.timeSlot || ''))
+    ));
   const waiting = allWaiting.filter(matchesBookingSearch);
 
   document.getElementById('queue-current').textContent      = queueStatus.currentQueue || current?.queueNumber || '-';
@@ -540,6 +740,7 @@ function renderQueuePage() {
   document.getElementById('queue-waiting-count').textContent = `${waiting.length} คิว`;
   document.getElementById('queue-done-count').textContent    = `${done.length} คิว`;
   document.getElementById('queue-list-count').textContent    = `${waiting.length} คิว`;
+  renderHistoryPagination();
 
   document.getElementById('queue-tbody').innerHTML = waiting.map(b => `
     <tr>
@@ -555,9 +756,25 @@ function renderQueuePage() {
       <td>
         <button class="action-btn btn-call" data-booking-action="call" data-booking-id="${escapeHtml(b.id)}">เรียก</button>
         <button class="action-btn btn-cancel" data-booking-action="cancel" data-booking-id="${escapeHtml(b.id)}">ยกเลิก</button>
+        ${bookingDetailsButton(b.id)}
       </td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--slate);padding:24px">ไม่มีคิวที่รออยู่</td></tr>';
+
+  document.getElementById('queue-history-tbody').innerHTML = history
+    .filter(matchesBookingSearch)
+    .map(b => `
+      <tr>
+        <td>${escapeHtml(formatBookingDate(b.bookingDate))}</td>
+        <td class="queue-id">${escapeHtml(b.queueNumber || '-')}</td>
+        <td>${escapeHtml(b.timeSlot || '-')}</td>
+        <td>${escapeHtml(b.customerName || b.userName || '-')}</td>
+        <td>${escapeHtml(b.serviceName || '-')}</td>
+        <td>${escapeHtml(b.staffName || '-')}</td>
+        <td><span class="badge ${STATUS_BADGE[b.status] || 'badge-gray'}">${escapeHtml(STATUS_LABEL[b.status] || b.status)}</span></td>
+        <td>${bookingDetailsButton(b.id)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">ยังไม่มีประวัติคิว</td></tr>';
 }
 
 function matchesBookingSearch(booking) {
@@ -602,7 +819,8 @@ document.addEventListener('click', (event) => {
   if (!button) return;
 
   const { bookingAction, bookingId, notificationAction, notificationId } = button.dataset;
-  if (bookingAction === 'complete') markDone(bookingId);
+  if (bookingAction === 'details') openBookingDetails(bookingId);
+  else if (bookingAction === 'complete') markDone(bookingId);
   else if (bookingAction === 'cancel') cancelBooking(bookingId);
   else if (bookingAction === 'call') callSpecific(bookingId);
   else if (notificationAction === 'resend') resendNotification(notificationId);
@@ -706,7 +924,7 @@ async function renderReport() {
         timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'short',
       }).format(new Date(`${row.date}T00:00:00.000Z`)))}</td>
       <td>${escapeHtml(row.total)}</td><td>${escapeHtml(row.done)}</td><td>${escapeHtml(row.cancelled)}</td>
-      <td>${escapeHtml((Number(row.revenue) || 0).toLocaleString())} ฿</td></tr>
+      <td>${row.revenue == null ? 'ไม่มีข้อมูลการชำระเงิน' : `${escapeHtml(Number(row.revenue).toLocaleString())} ฿`}</td></tr>
     `).join('');
   } catch (err) {
     document.getElementById('report-tbody').innerHTML = `<tr><td colspan="5">โหลดรายงานไม่สำเร็จ: ${escapeHtml(err.message)}</td></tr>`;
@@ -750,9 +968,9 @@ async function init() {
   await renderReport();
   await loadSettings();
 
-  // Auto-refresh ทุก 15 วินาที
-  setInterval(loadBookings, 15000);
-  setInterval(loadNotifications, 15000);
+  // Refresh lists periodically without creating Firestore listeners.
+  setInterval(loadBookings, 60000);
+  setInterval(loadNotifications, 60000);
   setInterval(() => {
     if (document.getElementById('page-queue').classList.contains('active')) {
       loadUpcomingBookings();

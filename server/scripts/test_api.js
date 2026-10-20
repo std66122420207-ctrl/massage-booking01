@@ -7,6 +7,7 @@ process.env.NODE_ENV = 'test';
 const http = require('http');
 const app  = require('../index');
 const { isBookingCounted, summarizeBookingCounts, getReportDates } = require('../routes/admin');
+const { parseTimeToMinutes, isWithinOperatingHours } = require('../services/bookingPolicy');
 
 async function runTests() {
   const PORT = 4321;
@@ -83,10 +84,27 @@ async function runTests() {
       }
     });
 
-    await test('GET /api/bookings/admin/upcoming requires admin authentication', async () => {
-      const res = await request('/api/bookings/admin/upcoming');
-      if (res.status !== 401 && res.status !== 403) {
-        throw new Error(`Expected protected route response 401/403, got ${res.status}`);
+    await test('Admin booking lists require admin authentication', async () => {
+      for (const path of [
+        '/api/bookings/admin/upcoming',
+        '/api/bookings/admin/history',
+      ]) {
+        const res = await request(path);
+        if (res.status !== 401 && res.status !== 403) {
+          throw new Error(`Expected protected route response 401/403 for ${path}, got ${res.status}`);
+        }
+      }
+    });
+
+    await test('Booking detail and national ID endpoints require admin authentication', async () => {
+      for (const path of [
+        '/api/bookings/admin/test-booking/details',
+        '/api/bookings/admin/test-booking/national-id',
+      ]) {
+        const res = await request(path);
+        if (res.status !== 401 && res.status !== 403) {
+          throw new Error(`Expected protected route response 401/403 for ${path}, got ${res.status}`);
+        }
       }
     });
 
@@ -152,6 +170,7 @@ async function runTests() {
       const summary = summarizeBookingCounts(items);
       if (summary.total !== 3) throw new Error(`Expected total 3, got ${summary.total}`);
       if (summary.cancelled !== 0) throw new Error(`Expected cancelled count 0, got ${summary.cancelled}`);
+      if (summary.revenue !== null) throw new Error('Revenue must remain unknown until payment data is recorded');
     });
 
     await test('Admin report dates use Bangkok calendar days', async () => {
@@ -163,6 +182,39 @@ async function runTests() {
       ];
       if (JSON.stringify(dates) !== JSON.stringify(expected)) {
         throw new Error(`Expected Bangkok report dates ${expected.join(', ')}, got ${dates.join(', ')}`);
+      }
+    });
+
+    await test('Operating hours accept bookings ending exactly at closing time', async () => {
+      if (!isWithinOperatingHours('18:05', 45, '08:30', '18:50')) {
+        throw new Error('Expected a booking ending at closing time to be allowed');
+      }
+    });
+
+    await test('Operating hours reject bookings before opening or ending after closing', async () => {
+      if (isWithinOperatingHours('08:00', 45, '08:30', '18:50')) {
+        throw new Error('Expected a booking before opening time to be rejected');
+      }
+      if (isWithinOperatingHours('18:10', 45, '08:30', '18:50')) {
+        throw new Error('Expected a booking ending after closing time to be rejected');
+      }
+    });
+
+    await test('Booking time and operating-hours settings require valid 24-hour times', async () => {
+      if (parseTimeToMinutes('18:50') !== 1130) throw new Error('Expected 18:50 to parse to 1130 minutes');
+      for (const value of ['24:00', '12:60', '8:30', '']) {
+        if (parseTimeToMinutes(value) !== null) throw new Error(`Expected ${value} to be rejected`);
+      }
+      if (isWithinOperatingHours('09:00', 60, '18:00', '08:00')) {
+        throw new Error('Expected inverted operating hours to be rejected');
+      }
+    });
+
+    await test('Operating hours reject invalid or non-positive service durations', async () => {
+      for (const duration of [0, -45, Number.NaN, Number.POSITIVE_INFINITY]) {
+        if (isWithinOperatingHours('09:00', duration, '08:30', '17:00')) {
+          throw new Error(`Expected duration ${duration} to be rejected`);
+        }
       }
     });
 

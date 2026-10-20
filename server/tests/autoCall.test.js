@@ -116,7 +116,7 @@ const priorBookings = [
 	{ nationalId: '1234567890123', healthcareRight: 'social_security', status: 'pending' },
 	{ nationalId: '1234567890123', healthcareRight: 'direct', status: 'cancelled' },
 ];
-assert.strictEqual(isHealthcareRightAlreadyUsed(priorBookings, '1234567890123', 'universal'), true);
+assert.strictEqual(isHealthcareRightAlreadyUsed(priorBookings, '1234567890123', 'universal'), false);
 assert.strictEqual(isHealthcareRightAlreadyUsed(priorBookings, '1234567890123', 'social_security'), true);
 assert.strictEqual(isHealthcareRightAlreadyUsed(priorBookings, '1234567890123', 'direct'), false);
 assert.strictEqual(isHealthcareRightAlreadyUsed([

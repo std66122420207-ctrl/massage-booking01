@@ -4,11 +4,19 @@ const { v4: uuidv4 } = require('uuid');
 const { db, COLLECTIONS, admin } = require('../config/firebase');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 const { createBookingTransaction } = require('../services/bookingTransaction');
+const { getBookingHistoryPage } = require('../services/bookingHistory');
+const { runBookingRetentionIfDue } = require('../services/bookingRetention');
 const { notifyBookingCancelled } = require('./notifications');
 const {
+  normalizeNationalId,
   isBookingCancellable,
+  canReassignBookingStaff,
   getBangkokDate,
   dateStringToUtc,
+  parseTimeToMinutes,
+  isWithinOperatingHours,
+  getServiceQueueCode,
+  getStaffQueueOrder,
 } = require('../services/bookingPolicy');
 
 function getBangkokNow() {
@@ -33,7 +41,11 @@ router.get('/', verifyToken, async (req, res) => {
       .limit(20)
       .get();
 
-    const bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const bookings = snap.docs.map((d) => {
+      const booking = { id: d.id, ...d.data() };
+      delete booking.nationalId;
+      return booking;
+    });
     res.json(bookings);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -83,7 +95,8 @@ router.post('/', verifyToken, async (req, res) => {
     const resolvedCustomerPhone = customerPhone || userProfile.phone || req.user.phone_number || '';
 
     const settingsDoc = await db.collection('settings').doc('general').get();
-    const maxAdvanceDays = Number(settingsDoc.data()?.advance) || 3;
+    const settings = settingsDoc.data() || {};
+    const maxAdvanceDays = Number(settings.advance) || 3;
     if (diffDays < 0 || diffDays > maxAdvanceDays) {
       return res.status(400).json({ error: `จองล่วงหน้าได้ไม่เกิน ${maxAdvanceDays} วัน` });
     }
@@ -94,6 +107,22 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'ไม่พบบริการที่เลือก' });
     }
     const service = serviceDoc.data();
+    const duration = Number(service.duration) || 60;
+    const openTime = settings.open ?? '08:30';
+    const closeTime = settings.close ?? '17:00';
+    const openingMinutes = parseTimeToMinutes(openTime);
+    const closingMinutes = parseTimeToMinutes(closeTime);
+    if (openingMinutes === null || closingMinutes === null || openingMinutes >= closingMinutes) {
+      return res.status(500).json({ error: 'เวลาทำการของระบบยังตั้งค่าไม่ถูกต้อง' });
+    }
+    const startMinutes = parseTimeToMinutes(timeSlot);
+    if (startMinutes === null) {
+      return res.status(400).json({ error: 'รูปแบบเวลาไม่ถูกต้อง' });
+    }
+    if (!isWithinOperatingHours(timeSlot, duration, openTime, closeTime)) {
+      return res.status(400).json({ error: 'เวลาให้บริการอยู่นอกเวลาทำการ กรุณาเลือกเวลาใหม่' });
+    }
+
     const staffDoc = await db.collection(COLLECTIONS.STAFF).doc(staffId).get();
     if (!staffDoc.exists || staffDoc.data().active !== true) {
       return res.status(404).json({ error: 'ไม่พบหมอนวดที่เลือก' });
@@ -101,13 +130,17 @@ router.post('/', verifyToken, async (req, res) => {
     if ((staffDoc.data().status || 'available') !== 'available') {
       return res.status(409).json({ error: 'หมอนวดคนนี้ไม่ว่าง กรุณาเลือกคนอื่น' });
     }
-
-    const [hours, minutes] = String(timeSlot).split(':').map(Number);
-    const startMinutes = hours * 60 + minutes;
-    const duration = Number(service.duration) || 60;
-    if (!Number.isFinite(startMinutes) || startMinutes < 0 || startMinutes >= 1440) {
-      return res.status(400).json({ error: 'รูปแบบเวลาไม่ถูกต้อง' });
+    const serviceCode = getServiceQueueCode(service.name);
+    if (!serviceCode) {
+      return res.status(409).json({ error: 'ยังไม่ได้กำหนดรหัสคิวสำหรับบริการนี้' });
     }
+    const staffOrder = getStaffQueueOrder(staffDoc.data().queueOrder);
+    if (!staffOrder) {
+      return res.status(409).json({
+        error: 'ยังไม่ได้กำหนดลำดับคิวให้หมอนวด กรุณาให้ผู้ดูแลทำขั้นตอนเตรียมรหัสคิวก่อน',
+      });
+    }
+
     const bangkokNow = getBangkokNow();
     if (bookingDate === bangkokNow.date && startMinutes <= bangkokNow.minutes) {
       return res.status(400).json({ error: 'เวลานัดนี้ผ่านไปแล้ว กรุณาเลือกเวลาใหม่' });
@@ -122,6 +155,9 @@ router.post('/', verifyToken, async (req, res) => {
       bookingId,
       bookingDate,
       staffId,
+      serviceId,
+      serviceCode,
+      staffOrder,
       startMinutes,
       endMinutes,
       healthcareRight,
@@ -149,7 +185,9 @@ router.post('/', verifyToken, async (req, res) => {
       },
     });
 
-    res.status(201).json({ success: true, booking });
+    const responseBooking = { ...booking };
+    delete responseBooking.nationalId;
+    res.status(201).json({ success: true, booking: responseBooking });
   } catch (err) {
     res.status(err.code === 409 ? 409 : 500).json({ error: err.message });
   }
@@ -213,6 +251,11 @@ router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
     const currentBooking = bookingDoc.data();
 
     if (staffId && staffId !== currentBooking.staffId) {
+      if (!canReassignBookingStaff(currentBooking)) {
+        return res.status(409).json({
+          error: 'เปลี่ยนหมอนวดไม่ได้หลังออกเลขคิว เพื่อให้รหัสคิวตรงกับหมอนวด กรุณายกเลิกและสร้างรายการใหม่',
+        });
+      }
       const staffDoc = await db.collection(COLLECTIONS.STAFF).doc(staffId).get();
       if (!staffDoc.exists || staffDoc.data().active !== true) {
         return res.status(404).json({ error: 'ไม่พบหมอนวดที่เลือก' });
@@ -230,7 +273,7 @@ router.patch('/:id', verifyToken, requireAdmin, async (req, res) => {
       const overlaps = staffBookings.docs.some((doc) => {
         if (doc.id === req.params.id) return false;
         const existing = doc.data();
-        if (!['pending', 'confirmed', 'in_service'].includes(existing.status)) return false;
+        if (!['pending', 'confirmed', 'auto_called', 'in_service'].includes(existing.status)) return false;
         const [existingHours, existingMinutes] = String(existing.timeSlot || '').split(':').map(Number);
         const existingStart = existingHours * 60 + existingMinutes;
         const existingEnd = existingStart + (Number(existing.duration) || 60);
@@ -265,29 +308,23 @@ router.get('/admin/today', verifyToken, requireAdmin, async (req, res) => {
       .where('bookingDate', '==', today)
       .get();
 
-    const staffSnap = await db.collection(COLLECTIONS.STAFF).get();
-    const staffById = Object.fromEntries(staffSnap.docs.map((d) => [d.id, d.data()]));
-    const userIds = [...new Set(snap.docs.map((d) => d.data().userId).filter(Boolean))];
-    const userEntries = await Promise.all(userIds.map(async (uid) => {
-      const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
-      return [uid, userDoc.exists ? userDoc.data() : {}];
-    }));
-    const userById = Object.fromEntries(userEntries);
     const bookings = snap.docs
       .map(d => {
         const booking = { id: d.id, ...d.data() };
-        const user = userById[booking.userId] || {};
-        const staff = staffById[booking.staffId] || {};
+        delete booking.nationalId;
         return {
           ...booking,
-          customerName: booking.customerName || user.name || '',
-          customerPhone: booking.customerPhone || user.phone || '',
-          staffName: staff.name || '',
+          customerName: booking.customerName || '',
+          customerPhone: booking.customerPhone || '',
+          staffName: booking.staffName || '',
           healthcareRightLabel: booking.healthcareRightLabel || booking.healthcareRight || 'จ่ายตรง',
           channel: booking.channel || 'app',
         };
       })
-      .sort((a, b) => String(a.timeSlot || '').localeCompare(String(b.timeSlot || '')));
+      .sort((a, b) => (
+        String(a.bookingDate || '').localeCompare(String(b.bookingDate || ''))
+        || String(a.timeSlot || '').localeCompare(String(b.timeSlot || ''))
+      ));
     res.json(bookings);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -302,24 +339,15 @@ router.get('/admin/upcoming', verifyToken, requireAdmin, async (req, res) => {
       .where('bookingDate', '>', today)
       .get();
 
-    const staffSnap = await db.collection(COLLECTIONS.STAFF).get();
-    const staffById = Object.fromEntries(staffSnap.docs.map((d) => [d.id, d.data()]));
-    const userIds = [...new Set(snap.docs.map((d) => d.data().userId).filter(Boolean))];
-    const userEntries = await Promise.all(userIds.map(async (uid) => {
-      const userDoc = await db.collection(COLLECTIONS.USERS).doc(uid).get();
-      return [uid, userDoc.exists ? userDoc.data() : {}];
-    }));
-    const userById = Object.fromEntries(userEntries);
     const bookings = snap.docs
       .map((d) => {
         const booking = { id: d.id, ...d.data() };
-        const user = userById[booking.userId] || {};
-        const staff = staffById[booking.staffId] || {};
+        delete booking.nationalId;
         return {
           ...booking,
-          customerName: booking.customerName || user.name || '',
-          customerPhone: booking.customerPhone || user.phone || '',
-          staffName: staff.name || booking.staffName || '',
+          customerName: booking.customerName || '',
+          customerPhone: booking.customerPhone || '',
+          staffName: booking.staffName || '',
           healthcareRightLabel: booking.healthcareRightLabel || booking.healthcareRight || 'จ่ายตรง',
           channel: booking.channel || 'app',
         };
@@ -329,6 +357,80 @@ router.get('/admin/upcoming', verifyToken, requireAdmin, async (req, res) => {
         || String(a.timeSlot || '').localeCompare(String(b.timeSlot || ''))
       ));
     res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/admin/history', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const retention = await runBookingRetentionIfDue({ db });
+    if (retention.deletedCount > 0) {
+      console.info(`Booking retention removed ${retention.deletedCount} expired history records.`);
+    }
+    const page = await getBookingHistoryPage({
+      db,
+      today: getBangkokDate(),
+      cursor: req.query.cursor,
+      limit: req.query.limit ?? 50,
+      documentIdField: admin.firestore.FieldPath.documentId(),
+    });
+    res.json(page);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+async function getBookingNationalId(booking) {
+  const bookingNationalId = normalizeNationalId(booking.nationalId);
+  if (bookingNationalId) return bookingNationalId;
+  if (!booking.userId) return '';
+  const userDoc = await db.collection(COLLECTIONS.USERS).doc(booking.userId).get();
+  return normalizeNationalId(userDoc.exists ? userDoc.data().citizenId : '');
+}
+
+function maskNationalId(value) {
+  const normalized = normalizeNationalId(value);
+  if (!normalized) return '';
+  if (normalized.length <= 4) return '*'.repeat(normalized.length);
+  return `${'*'.repeat(normalized.length - 4)}${normalized.slice(-4)}`;
+}
+
+router.get('/admin/:id/details', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const bookingDoc = await db.collection(COLLECTIONS.BOOKINGS).doc(req.params.id).get();
+    if (!bookingDoc.exists) return res.status(404).json({ error: 'ไม่พบการจอง' });
+    const booking = bookingDoc.data();
+    const userDoc = booking.userId
+      ? await db.collection(COLLECTIONS.USERS).doc(booking.userId).get()
+      : null;
+    const user = userDoc?.exists ? userDoc.data() : {};
+    const nationalId = normalizeNationalId(booking.nationalId || user.citizenId);
+    const response = {
+      customerName: booking.customerName || user.name || '',
+      customerPhone: booking.customerPhone || user.phone || '',
+      nationalIdMasked: maskNationalId(nationalId),
+      hasNationalId: Boolean(nationalId),
+      serviceName: booking.serviceName || '',
+      staffName: booking.staffName || '',
+      bookingDate: booking.bookingDate || '',
+      timeSlot: booking.timeSlot || '',
+      queueNumber: booking.queueNumber || '',
+      bookingStatus: booking.status || '',
+      paymentStatus: booking.paymentStatus || (booking.paidAt ? 'paid' : 'unknown'),
+    };
+    res.json(response);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/admin/:id/national-id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const bookingDoc = await db.collection(COLLECTIONS.BOOKINGS).doc(req.params.id).get();
+    if (!bookingDoc.exists) return res.status(404).json({ error: 'ไม่พบการจอง' });
+    const nationalId = await getBookingNationalId(bookingDoc.data());
+    res.json({ nationalId: nationalId || null });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

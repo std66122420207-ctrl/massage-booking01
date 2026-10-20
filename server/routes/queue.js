@@ -76,6 +76,7 @@ router.get('/my', verifyToken, async (req, res) => {
     }
 
     const myBooking = { id: mySnap.docs[0].id, ...mySnap.docs[0].data() };
+    delete myBooking.nationalId;
     const response = {
       hasQueue: true,
       booking: myBooking,
@@ -108,7 +109,10 @@ router.post('/call-next', verifyToken, requireAdmin, async (req, res) => {
 
       const next = snap.docs
         .filter(doc => ['pending', 'confirmed', 'auto_called'].includes(doc.data().status))
-      .sort((a, b) => String(a.data().timeSlot || '').localeCompare(String(b.data().timeSlot || '')))
+      .sort((a, b) => (
+        String(a.data().bookingDate || '').localeCompare(String(b.data().bookingDate || ''))
+        || String(a.data().timeSlot || '').localeCompare(String(b.data().timeSlot || ''))
+      ))
       .at(0);
 
     if (!next) {
@@ -156,10 +160,12 @@ router.post('/call-next', verifyToken, requireAdmin, async (req, res) => {
       { bookingId: next.id, queueNumber: String(data.queueNumber) }
     ).catch((err) => console.error('ส่ง push notification ไม่สำเร็จ:', err));
 
+    const responseBooking = { id: next.id, ...data };
+    delete responseBooking.nationalId;
     res.json({
       success:  true,
       called:   data.queueNumber,
-      booking:  { id: next.id, ...data },
+      booking:  responseBooking,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -208,7 +214,9 @@ router.post('/call', verifyToken, requireAdmin, async (req, res) => {
       { bookingId, queueNumber: String(data.queueNumber) }
     ).catch((err) => console.error('ส่ง push notification ไม่สำเร็จ:', err));
 
-    res.json({ success: true, called: data.queueNumber, booking: { id: bookingId, ...data, status: 'in_service' } });
+    const responseBooking = { id: bookingId, ...data, status: 'in_service' };
+    delete responseBooking.nationalId;
+    res.json({ success: true, called: data.queueNumber, booking: responseBooking });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

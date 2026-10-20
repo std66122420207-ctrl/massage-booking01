@@ -9,7 +9,7 @@
     "dev:server": "cd server && npm run dev",
     "start:server": "cd server && npm start",
     "test:server": "cd server && npm test",
-    "test:booking-concurrency": "firebase emulators:exec --project demo-massage-booking-concurrency --only firestore \"node server/tests/bookingConcurrency.test.js\"",
+    "test:booking-concurrency": "firebase emulators:exec --project demo-massage-booking-concurrency --only firestore \"node server/tests/bookingConcurrency.test.js && node server/tests/bookingHistoryRetention.test.js\"",
     "predeploy:firebase": "npm run test:server && node --test server/tests/autoCall.test.js",
     "dev:admin": "python -m http.server 8081 --directory web-admin/public",
     "dev:flutter": "cd flutter-app && flutter run -d chrome --web-port 8080",
