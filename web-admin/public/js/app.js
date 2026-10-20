@@ -349,6 +349,18 @@ async function loadBookings() {
   ]);
   if (todayResult.status === 'fulfilled' && queueResult.status === 'fulfilled') {
     bookings = todayResult.value;
+
+    if (Array.isArray(bookings)) {
+      bookings.sort((a, b) => {
+        const timeCompare = (a.timeSlot || '').localeCompare(b.timeSlot || '');
+        if (timeCompare !== 0) return timeCompare;
+
+        const queueA = String(a.queueNumber || a.id || '');
+        const queueB = String(b.queueNumber || b.id || '');
+        return queueA.localeCompare(queueB, undefined, { numeric: true });
+      });
+    }
+
     queueStatus = queueResult.value || { currentQueue: null };
   } else {
     const err = todayResult.status === 'rejected' ? todayResult.reason : queueResult.reason;
@@ -976,4 +988,5 @@ async function init() {
       loadUpcomingBookings();
     }
   }, 60000);
+
 }
